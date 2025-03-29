@@ -1,0 +1,156 @@
+import torch
+import json
+import random
+
+from ..data_interface import register_dataset
+from transformers import EsmTokenizer
+from ..lmdb_dataset import *
+
+
+@register_dataset
+class SaprotClassificationDataset(LMDBDataset):
+    def __init__(self,
+                 tokenizer: str,
+                 use_bias_feature: bool = False,
+                 max_length: int = 1024,
+                 preset_label: int = None,
+                 mask_struc_ratio: float = None,
+                 mask_seed: int = 20000812,
+                 plddt_threshold: float = None,
+                 **kwargs):
+        """
+        Args:
+            tokenizer: Path to tokenizer
+            use_bias_feature: If True, structure information will be used
+            max_length: Max length of sequence
+            preset_label: If not None, all labels will be set to this value
+            mask_struc_ratio: Ratio of masked structure tokens, replace structure tokens with "#"
+            mask_seed: Seed for mask_struc_ratio
+            plddt_threshold: If not None, mask structure tokens with pLDDT < threshold
+            **kwargs:
+        """
+        super().__init__(**kwargs)
+        self.tokenizer = EsmTokenizer.from_pretrained(tokenizer)
+        self.max_length = max_length
+        self.use_bias_feature = use_bias_feature
+        self.preset_label = preset_label
+        self.mask_struc_ratio = mask_struc_ratio
+        self.mask_seed = mask_seed
+        self.plddt_threshold = plddt_threshold
+
+        self.proteins_without_ligands = []
+        self.proteins_with_ligands_ids = []
+        self.proteins_with_ligands_indexes = []
+
+    def __getitem__(self, index):
+
+        # count = 0
+        # proteins = 0
+        # for ii in range(self.__len__()):
+        #     proteins += 1
+        #     entry = json.loads(self._get(ii))
+        #     uniprot_id, ligand_list = entry['name'], []
+        #     ligand_list = self.pdbbind_df[self.pdbbind_df['uniprot_id'] == uniprot_id][["smiles", "value", "ic50",
+        #                                                                                 "kd", "ki"]].values.tolist()
+        #     ligand_list = [(item[0], [item[1], item[2], item[3], item[4]]) for item in ligand_list]
+        #     if ligand_list:
+        #         count += 1
+        #     print(f"Number of proteins with ligands: {count}, from: {proteins}")
+
+        entry = json.loads(self._get(index))
+        seq = entry['seq']
+
+        # Ligands Extraction
+        uniprot_id, ligand_list = entry['name'], []
+        ligand_list = self.pdbbind_df[self.pdbbind_df['uniprot_id'] == uniprot_id][["smiles", "value", "ic50",
+                                                                                    "kd", "ki"]].values.tolist()
+        ligand_list = [(item[0], [item[1], item[2], item[3], item[4]]) for item in ligand_list]
+
+        if ligand_list and uniprot_id not in self.proteins_with_ligands_ids:
+            self.proteins_with_ligands_ids.append(uniprot_id)
+            print("proteins with ligands:", len(self.proteins_with_ligands_ids))
+
+        # if uniprot_id in self.ligands_dataset:
+        #     ligand_list = [data_point['smi'] for data_point in
+        #                    self.ligands_dataset[uniprot_id] if 'smi' in data_point]
+        #     print("ligand_list:", len(ligand_list))
+
+        # else:
+        #     if uniprot_id not in self.proteins_without_ligands:
+        #         best_match, best_score = self.find_most_similar(uniprot_id, self.fetch_uniprot_sequence(uniprot_id),
+        #                                                         self.protein_sequences)
+        #         if best_score >= self.ligand_score_th:
+        #             ligand_list = [(data_point['smi'], data_point['label']['ic50']) for data_point in
+        #                              self.ligands_dataset[best_match] if
+        #                              'label' in data_point and 'ic50' in data_point['label']]
+        #             self.ligands_dataset[uniprot_id] = self.ligands_dataset[best_match]  # Cache the result for next iter
+        #         else:
+        #             self.proteins_without_ligands.append(uniprot_id)
+        #
+        # if uniprot_id not in self.proteins_with_ligands_ids and ligand_list:
+        #     print("new protein received")
+        #     self.proteins_with_ligands_ids.append(uniprot_id)
+        #     self.proteins_with_ligands_indexes.append(index)
+        #     print("proteins with ligands:", len(self.proteins_with_ligands_indexes))
+
+        # if not ligand_list:
+        #     if self.proteins_with_ligands_indexes:
+        #         new_index = random.sample(self.proteins_with_ligands_indexes, 1)[0]  # change to iterate pass
+        #         print("new_index:", new_index)
+        #         return self.__getitem__(new_index)
+
+        # Mask structure tokens
+        if self.mask_struc_ratio is not None:
+            tokens = self.tokenizer.tokenize(seq)
+            mask_candi = [i for i, t in enumerate(tokens) if t[-1] != "#"]
+            
+            # Randomly shuffle the mask candidates and set seed to ensure mask is consistent
+            random.seed(self.mask_seed)
+            random.shuffle(mask_candi)
+            
+            # Mask first n structure tokens
+            mask_num = int(len(mask_candi) * self.mask_struc_ratio)
+            for i in range(mask_num):
+                idx = mask_candi[i]
+                tokens[idx] = tokens[idx][:-1] + "#"
+            
+            seq = "".join(tokens)
+
+        # Mask structure tokens with pLDDT < threshold
+        if self.plddt_threshold is not None:
+            plddt = entry["plddt"]
+            tokens = self.tokenizer.tokenize(seq)
+            seq = ""
+            for token, score in zip(tokens, plddt):
+                if score < self.plddt_threshold:
+                    seq += token[:-1] + "#"
+                else:
+                    seq += token
+
+        tokens = self.tokenizer.tokenize(seq)[:self.max_length]
+        seq = " ".join(tokens)
+        
+        if self.use_bias_feature:
+            coords = {k: v[:self.max_length] for k, v in entry['coords'].items()}
+        else:
+            coords = None
+
+        label = entry["label"] if self.preset_label is None else self.preset_label
+
+        return seq, label, coords, ligand_list
+
+    def __len__(self):
+        return int(self._get("length"))
+
+    def collate_fn(self, batch):
+        seqs, label_ids, coords, ligand_list = tuple(zip(*batch))
+
+        label_ids = torch.tensor(label_ids, dtype=torch.long)
+        labels = {"labels": label_ids}
+    
+        encoder_info = self.tokenizer.batch_encode_plus(seqs, return_tensors='pt', padding=True)
+        inputs = {"inputs": encoder_info}
+        if self.use_bias_feature:
+            inputs["coords"] = coords
+
+        return inputs, labels, ligand_list
