@@ -1,6 +1,15 @@
-LMDB/
+LMDB/*
+!LMDB/README
+
 weights/
 weights 2
+
+bin/foldseek
+
+dataset/siu_dataset.py
+dataset/tmp_siu_dataset.pkl
+
+example/*.pdb
 
 .idea/
 .idea/workspace.xml
