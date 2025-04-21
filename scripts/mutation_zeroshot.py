@@ -20,27 +20,27 @@ def run(config):
     trainer = load_trainer(config)
 
     # Record results
-    if config.setting.os_environ.NODE_RANK == 0 and config.setting.out_path is not None:
-        out_path = config.setting.out_path
-        out_dir = os.path.dirname(out_path)
-        if not os.path.exists(out_dir):
-            os.makedirs(out_dir)
+    # if config.setting.os_environ.NODE_RANK == 0 and config.setting.out_path is not None:
+    print("Recording records")
+    out_path = config.setting.out_path
+    out_dir = os.path.dirname(out_path)
+    if not os.path.exists(out_dir):
+        os.makedirs(out_dir)
 
-        w = open(config.setting.out_path, 'w')
+    with open(config.setting.out_path, 'w') as w:
         w.write("dataset\tspearman\n")
 
-    # Save logs for ClinVar benchmark
-    if config.model.kwargs.get("log_dir", None) is not None:
-        os.makedirs(config.model.kwargs.log_dir, exist_ok=True)
+        if config.model.kwargs.get("log_dir", None) is not None:
+            os.makedirs(config.model.kwargs.log_dir, exist_ok=True)
 
-    for name in tqdm(os.listdir(config.setting.dataset_dir)):
-        print(name)
-        path = os.path.join(config.setting.dataset_dir, name)
-        data_module.test_lmdb = path
-        result = trainer.test(model=model, datamodule=data_module)
-        spearman = result[0]['spearman']
+        for name in tqdm(os.listdir(config.setting.dataset_dir)):
+            print(name)
+            path = os.path.join(config.setting.dataset_dir, name)
+            data_module.test_lmdb = path
+            result = trainer.test(model=model, datamodule=data_module)
+            spearman = result[0]['spearman']
 
-        if config.setting.os_environ.NODE_RANK == 0 and config.setting.out_path is not None:
+            # if config.setting.os_environ.NODE_RANK == 0 and config.setting.out_path is not None:
             w.write(f"{name}\t{spearman:.4f}\n")
 
 

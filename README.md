@@ -349,6 +349,12 @@ If you find this repository useful, please cite our paper:
 
 
 ## ProtLigand Tasks
+
+# training data:
+https://drive.google.com/file/d/1sNxu22HDptZckgP3L22U-jJqmMfIgoH_/view?usp=sharing
+
+
+
 python scripts/training.py -c config/Thermostability/saprot.yaml
 
 python scripts/training.py -c config/GO/CC/saprot.yaml
@@ -379,15 +385,19 @@ srun --gres=gpu:1 -c 8 --nodelist=entropy2 --pty /bin/bash
 # ProtLigand
 python scripts/training.py -c config/pretrain/protligand.yaml
 
-python scripts/training.py -c config/ProteinGym/saprot.yaml
+python scripts/training.py -c config/pretrain/ligand_generator.yaml
+
+python scripts/mutation_zeroshot.py -c config/ProteinGym/protligand.yaml
 
 python scripts/training.py -c config/HumanPPI/protligand.yaml
+
+python scripts/training.py -c config/Contact/saprot.yaml
 
 python scripts/training.py -c config/EC/protligand.yaml
 
 python scripts/training.py -c config/DeepLoc/cls10/protligand.yaml
 
-python scripts/training.py -c config/MetalIonBinding/saprot.yaml
+python scripts/training.py -c config/MetalIonBinding/protligand.yaml
 
 python scripts/training.py -c config/DeepLoc/cls2/protligand.yaml
 
@@ -396,9 +406,6 @@ python scripts/training.py -c config/Thermostability/protligand.yaml
 python scripts/training.py -c config/GO/CC/protligand.yaml
 
 python scripts/training.py -c config/GO/MF/protligand.yaml
-
-
-# TODO: NEEDS TO MOVE ALL LIGANDS PARAMETERS TO THE YAML CONFIG TO ENABLE TRAINING SAPROT WITHOUT CODE CHANGES
 
 
 # If you have import error, do:

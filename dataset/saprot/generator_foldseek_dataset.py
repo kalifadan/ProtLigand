@@ -31,7 +31,7 @@ def pad_sequences(sequences, constant_value=0, dtype=None) -> np.ndarray:
 
 
 @register_dataset
-class ProtLigandFoldseekDataset(LMDBDataset):
+class GeneratorFoldseekDataset(LMDBDataset):
 	"""
 	Dataset of Mask Token Reconstruction with Structure information
 	"""
@@ -73,15 +73,9 @@ class ProtLigandFoldseekDataset(LMDBDataset):
 		ids = self.tokenizer.encode(seq, add_special_tokens=False)
 		tokens = self.tokenizer.convert_ids_to_tokens(ids)
 
-		while True:
-			masked_tokens, labels = self._apply_bert_mask(tokens)
-			masked_seq = " ".join(masked_tokens)
-			
-			# Check if there is at least one masked token
-			if (labels != -1).sum().item() != 0:
-				break
-
-		return masked_seq, labels, ligand_list
+		# # TODO: ONLY FOR LIGAND GENERATOR
+		labels = torch.full((len(tokens) + 2,), -1, dtype=torch.long)
+		return " ".join(tokens), labels, ligand_list
 	
 	def _apply_bert_mask(self, tokens):
 		masked_tokens = copy.copy(tokens)

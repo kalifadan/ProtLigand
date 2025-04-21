@@ -77,4 +77,4 @@ class SaprotContactDataset(LMDBDataset):
         targets = torch.tensor(contact_maps, dtype=torch.long)
         labels = {"targets": targets, "lengths": lengths}
 
-        return inputs, labels
+        return inputs, labels, None, None

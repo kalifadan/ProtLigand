@@ -3,7 +3,7 @@ setting:
   os_environ:
     WANDB_API_KEY: ~
     WANDB_RUN_ID: ~
-    CUDA_VISIBLE_DEVICES: 0,1,2,3,4,5,6,7
+    CUDA_VISIBLE_DEVICES: 0,1,2,3
     MASTER_ADDR: 127.0.0.1
     MASTER_PORT: 12316
     WORLD_SIZE: 1
@@ -40,8 +40,8 @@ dataset:
 #    Arguments to initialize the basic class LMDBDataset
   dataset_py_path: saprot/saprot_contact_dataset
   dataloader_kwargs:
-    batch_size: 2
-    num_workers: 8
+    batch_size: 1
+    num_workers: 1
   train_lmdb: LMDB/Contact/foldseek/train
   valid_lmdb: LMDB/Contact/foldseek/valid
   test_lmdb: LMDB/Contact/foldseek/test
@@ -61,6 +61,6 @@ Trainer:
   accelerator: gpu
   devices: 1
   num_nodes: 1
-  accumulate_grad_batches: 1
+  accumulate_grad_batches: 64
   precision: 16
   num_sanity_val_steps: 0

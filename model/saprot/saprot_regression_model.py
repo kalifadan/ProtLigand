@@ -1,4 +1,5 @@
 import torch.distributed as dist
+import os
 import torchmetrics
 import torch
 import torch.nn as nn
@@ -33,17 +34,6 @@ class SaprotRegressionModel(SaprotBaseModel):
             # To be implemented
             raise NotImplementedError
 
-        # # Ligand-Protein Transformers
-        # if [] not in ligands:
-        #     ligands_embeddings, ligands_labels = self.process_ligands(ligands)
-        #     ligands_embeddings = ligands_embeddings.squeeze(0)
-        #     # ligands_labels = torch.tensor(ligands_labels, dtype=torch.float32).to(self.model.device)
-        # else:
-        #     ligands_embeddings = self.default_ligand.unsqueeze(0)
-        #     # ligands_labels = self.default_ligand_label.unsqueeze(0)
-        #
-        # # ligands_labels = self.label_adapter(ligands_labels)
-
         # If backbone is frozen, the embedding will be the average of all residues
         if self.freeze_backbone:
             representations = torch.stack(self.get_hidden_states(inputs, reduction="mean"))
@@ -53,42 +43,54 @@ class SaprotRegressionModel(SaprotBaseModel):
             x = self.model.classifier.dropout(x)
             logits = self.model.classifier.out_proj(x).squeeze(dim=-1)
         else:
-            logits = self.model(**inputs).logits.squeeze(dim=-1)
-            # output = self.model.esm(**inputs)
-            # hidden = output[0]
-            # ligands_embeddings = ligands_embeddings.unsqueeze(1).expand(-1, hidden.size(1), -1)
-            # # ligands_labels = ligands_labels.unsqueeze(1).expand(-1, hidden.size(1), -1)
-            # hidden = self.ligand_protein_transformer(torch.cat([hidden, ligands_embeddings], dim=-1))
-            # logits = self.model.classifier(hidden).squeeze(dim=-1)
+            # logits = self.model(**inputs).logits.squeeze(dim=-1)
+
+            output = self.model.esm(**inputs)
+            hidden = output[0]
+
+            # # Ligand-Protein Transformers
+            if [] not in ligands:
+                ligands_embeddings, ligands_labels = self.process_ligands(ligands)
+                ligands_embeddings = ligands_embeddings.squeeze(0)
+            else:
+                ligands_embeddings = self.ligand_generator(hidden[:, 0, :])
+
+            ligands_embeddings = self.ligand_proj(ligands_embeddings)  # [batch, ligand_dim] → [batch, hidden_dim]
+            ligands_embeddings = ligands_embeddings.unsqueeze(1).expand(-1, hidden.size(1), -1)  # Expand for attention
+
+            # Apply cross-attention (Protein as Query, Ligands as Key/Value)
+            attn_output, _ = self.cross_attention(
+                query=hidden,  # Protein embeddings
+                key=ligands_embeddings,
+                value=ligands_embeddings
+            )
+
+            # attn_output = self.norm(attn_output)  # Optional normalization before addition
+            hidden = hidden + attn_output  # Residual connection
+            logits = self.model.classifier(hidden).squeeze(dim=-1)
 
         return logits
 
-    def loss_func(self, stage, outputs, labels, inputs=None, ligands=None):
+    def loss_func(self, stage, outputs, labels, inputs=None, ligands=None, info=None):
         fitness = labels['labels'].to(outputs)
         task_loss = torch.nn.functional.mse_loss(outputs, fitness)
 
-        # proteins = inputs['inputs']
-        # generator_loss = self.protein_new_ligand_loss(proteins, ligands)
+        if stage == "test" and self.test_result_path is not None:
+            os.makedirs(os.path.dirname(self.test_result_path), exist_ok=True)
+            with open(self.test_result_path, 'a') as w:
+                uniprot_id, protein_type = info[0]
+                w.write(f"{uniprot_id}\t{protein_type}\t{outputs.detach().float().item()}\t{fitness.float().item()}\n")
 
-        loss = task_loss   # + 0.1 * generator_loss + 0.05 * (discriminator_real_loss + discriminator_fake_loss)
-
-        # if generator_loss is not None:
-        #     loss = generator_loss
-
+        loss = task_loss
         # Update metrics
         for metric in self.metrics[stage].values():
             # Training is on half precision, but metrics expect float to compute correctly.
             metric.update(outputs.detach().float(), fitness.float())
 
         if stage == "train":
-            # Skip calculating metrics if the batch size is 1
-            # if fitness.shape[0] > 1:
             log_dict = self.get_log_dict("train")
             log_dict["loss"] = loss
             log_dict["task_loss"] = task_loss
-            # log_dict["generator_loss"] = generator_loss
-            # log_dict["discriminator_real_loss"] = discriminator_real_loss
-            # log_dict["discriminator_fake_loss"] = discriminator_fake_loss
             self.log_info(log_dict)
 
             # Reset train metrics
@@ -97,26 +99,9 @@ class SaprotRegressionModel(SaprotBaseModel):
         return loss
 
     def test_epoch_end(self, outputs):
-        if self.test_result_path is not None:
-            from torchmetrics.utilities.distributed import gather_all_tensors
-
-            preds = self.test_spearman.preds
-            preds[-1] = preds[-1].unsqueeze(dim=0) if preds[-1].shape == () else preds[-1]
-            preds = torch.cat(gather_all_tensors(torch.cat(preds, dim=0)))
-
-            targets = self.test_spearman.target
-            targets[-1] = targets[-1].unsqueeze(dim=0) if targets[-1].shape == () else targets[-1]
-            targets = torch.cat(gather_all_tensors(torch.cat(targets, dim=0)))
-
-            if dist.get_rank() == 0:
-                with open(self.test_result_path, 'w') as w:
-                    w.write("pred\ttarget\n")
-                    for pred, target in zip(preds, targets):
-                        w.write(f"{pred.item()}\t{target.item()}\n")
-
         log_dict = self.get_log_dict("test")
-
         print(log_dict)
+
         self.log_info(log_dict)
         self.reset_metrics("test")
 

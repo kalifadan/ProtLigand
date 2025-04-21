@@ -1,8 +1,10 @@
 import numpy as np
 import torchmetrics
 import torch
+import os
 
 from torch.nn import Linear, ReLU, Sequential, Sigmoid
+import torch.nn.functional as F
 from torch.nn.functional import cross_entropy, cosine_similarity
 from ..model_interface import register_model
 from .base import SaprotBaseModel
@@ -10,12 +12,13 @@ from .base import SaprotBaseModel
 
 @register_model
 class SaprotPPIModel(SaprotBaseModel):
-    def __init__(self, **kwargs):
+    def __init__(self, test_result_path: str = None, **kwargs):
         """
         Args:
             **kwargs: other arguments for SaprotBaseModel
         """
         super().__init__(task="base", **kwargs)
+        self.test_result_path = test_result_path
 
     def initialize_model(self):
         super().initialize_model()
@@ -40,63 +43,54 @@ class SaprotPPIModel(SaprotBaseModel):
             hidden_1 = self.model.esm(**inputs_1)[0][:, 0, :]
             hidden_2 = self.model.esm(**inputs_2)[0][:, 0, :]
 
-        # Ligand-Protein Transformer
-        # if [] not in ligands['ligands_1']:
-        #     ligands_embeddings_1, ligands_labels_1 = self.process_ligands(ligands['ligands_1'])
-        #     ligands_embeddings_1 = ligands_embeddings_1.squeeze(0)
-        #     # ligands_labels_1 = torch.tensor(ligands_labels_1, dtype=torch.float32).to(self.model.device)
-        #     # ligands_labels_1 = self.label_adapter(ligands_labels_1)
-        # else:
-        #     ligands_embeddings_1 = self.default_ligand.unsqueeze(0)
-        #     # ligands_labels_1 = self.default_ligand_label.unsqueeze(0)
-        #
-        # if [] not in ligands['ligands_2']:
-        #     ligands_embeddings_2, ligands_labels_2 = self.process_ligands(ligands['ligands_2'])
-        #     ligands_embeddings_2 = ligands_embeddings_2.squeeze(0)
-        #     # ligands_labels_2 = torch.tensor(ligands_labels_2, dtype=torch.float32).to(self.model.device)
-        #     # ligands_labels_2 = self.label_adapter(ligands_labels_2)
-        # else:
-        #     ligands_embeddings_2 = self.default_ligand.unsqueeze(0)
-        #     # ligands_labels_2 = self.default_ligand_label.unsqueeze(0)
-        #
-        # # hidden_1 = self.ligand_protein_transformer(torch.cat([hidden_1, ligands_embeddings_1, ligands_labels_1], dim=-1))
-        # # hidden_2 = self.ligand_protein_transformer(torch.cat([hidden_2, ligands_embeddings_2, ligands_labels_2], dim=-1))
-        #
-        # hidden_1 = self.ligand_protein_transformer(torch.cat([hidden_1, ligands_embeddings_1], dim=-1))
-        # hidden_2 = self.ligand_protein_transformer(torch.cat([hidden_2, ligands_embeddings_2], dim=-1))
+        if [] not in ligands['ligands_1']:
+            ligands_embeddings_1, ligands_labels_1 = self.process_ligands(ligands['ligands_1'])
+            ligands_embeddings_1 = ligands_embeddings_1.squeeze(0)
+        else:
+            ligands_embeddings_1 = self.ligand_generator(hidden_1)
+
+        if [] not in ligands['ligands_2']:
+            ligands_embeddings_2, ligands_labels_2 = self.process_ligands(ligands['ligands_2'])
+            ligands_embeddings_2 = ligands_embeddings_2.squeeze(0)
+        else:
+            ligands_embeddings_2 = self.ligand_generator(hidden_2)
+
+        # Apply cross-attention (Protein as Query, Ligands as Key/Value)
+        ligands_embeddings_1 = self.ligand_proj(ligands_embeddings_1)  # [batch, ligand_dim] → [batch, hidden_dim]
+
+        attn_output_1, _ = self.cross_attention(
+            query=hidden_1,  # Protein embeddings
+            key=ligands_embeddings_1,
+            value=ligands_embeddings_1
+        )
+        hidden_1 = hidden_1 + attn_output_1  # Residual connection
+
+        # Apply cross-attention (Protein as Query, Ligands as Key/Value)
+        ligands_embeddings_2 = self.ligand_proj(ligands_embeddings_2)  # [batch, ligand_dim] → [batch, hidden_dim]
+
+        attn_output_2, _ = self.cross_attention(
+            query=hidden_2,  # Protein embeddings
+            key=ligands_embeddings_2,
+            value=ligands_embeddings_2
+        )
+        hidden_2 = hidden_2 + attn_output_2  # Residual connection
 
         hidden_concat = torch.cat([hidden_1, hidden_2], dim=-1)
         return self.model.classifier(hidden_concat)
     
-    def loss_func(self, stage, logits, labels, inputs=None, ligands=None):
+    def loss_func(self, stage, logits, labels, inputs=None, ligands=None, info=None):
         label = labels['labels']
         task_loss = cross_entropy(logits, label)
-
-        # protein_1, ligands_1 = inputs['inputs_1'], ligands['ligands_1']
-        # generator_loss_1 = self.protein_embeddings_sim_ligand_loss(protein_1, ligands_1)
-        #
-        # protein_2, ligands_2 = inputs['inputs_2'], ligands['ligands_2']
-        # generator_loss_2 = self.protein_embeddings_sim_ligand_loss(protein_2, ligands_2)
-        #
-        # # Return task_loss if both losses are None
-        # if generator_loss_1 is None and generator_loss_2 is None:
-        #     print("both proteins are unknown!")
-        #     loss = cross_entropy(logits, label)
-        # else:
-        #     if generator_loss_1 is None:
-        #         loss = generator_loss_2     # + task_loss
-        #     elif generator_loss_2 is None:
-        #         loss = generator_loss_1     # + task_loss
-        #     else:
-        #         loss = 0.5 * (generator_loss_1 + generator_loss_2)  # + task_loss
-
         loss = task_loss
-        # protein_1, ligands_1 = inputs['inputs_1'], ligands['ligands_1']
-        # generator_loss_1, disc_real_loss_1, disc_fake_loss_1 = self.protein_ligand_loss(protein_1, ligands_1)
-        # protein_2, ligands_2 = inputs['inputs_2'], ligands['ligands_2']
-        # generator_loss_2, disc_real_loss_2, disc_fake_loss_2 = self.protein_ligand_loss(protein_2, ligands_2)
-        # loss += 0.1 * (generator_loss_1 + generator_loss_2)
-        # loss += 0.05 * (disc_real_loss_1 + disc_fake_loss_1 + disc_real_loss_2 + disc_fake_loss_1)
+
+        if stage == "test" and self.test_result_path is not None:
+            os.makedirs(os.path.dirname(self.test_result_path), exist_ok=True)
+            with open(self.test_result_path, 'a') as w:
+                uniprot_id_1, protein_type_1 = info["protein_1"][0]
+                uniprot_id_2, protein_type_2 = info["protein_2"][0]
+                probs = F.softmax(logits, dim=1).squeeze().tolist()
+                probs_str = "\t".join([f"{p:.4f}" for p in probs])
+                w.write(f"{uniprot_id_1}\t{protein_type_1}\t{uniprot_id_2}\t{protein_type_2}\t{probs_str}\t{label.item()}\n")
 
         # Update metrics
         for metric in self.metrics[stage].values():
@@ -105,10 +99,6 @@ class SaprotPPIModel(SaprotBaseModel):
         if stage == "train":
             log_dict = self.get_log_dict("train")
             log_dict["train_loss"] = loss
-            # log_dict["original_task_loss"] = task_loss
-            # log_dict["generator_loss"] = generator_loss_1 + generator_loss_2
-            # log_dict["discriminator_real_loss"] = disc_real_loss_1 + disc_real_loss_2
-            # log_dict["discriminator_fake_loss"] = disc_fake_loss_1 + disc_fake_loss_2
             self.log_info(log_dict)
 
             # Reset train metrics
@@ -132,5 +122,5 @@ class SaprotPPIModel(SaprotBaseModel):
         self.log_info(log_dict)
         self.reset_metrics("valid")
 
-        self.check_save_condition(log_dict["valid_acc"], mode="max")        # TODO: MAYBE TO CHANGE TO VALID LOSS
-        # self.check_save_condition(log_dict["valid_loss"], mode="min")        # TODO: MAYBE TO CHANGE TO VALID LOSS
+        self.check_save_condition(log_dict["valid_acc"], mode="max")
+        # self.check_save_condition(log_dict["valid_loss"], mode="min")

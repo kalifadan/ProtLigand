@@ -27,24 +27,20 @@ class MutationZeroShotDataset(LMDBDataset):
         data = json.loads(self._get(index))
 
         # Ligands Extraction
-        # print(data)
-        # uniprot_seq, ligand_list = data['seq'], []
-        # if uniprot_id in self.ligands_dataset:
-        #     print("got here:", uniprot_id)
-        #     ligand_list = [(data_point['smi'], data_point['label']['ic50']) for data_point in
-        #                    self.ligands_dataset[uniprot_id] if 'label' in data_point and 'ic50' in data_point['label']]
-        #     print("ligand_list:", len(ligand_list))
-        #     if uniprot_id not in self.proteins_with_ligands_ids and ligand_list:
-        #         self.proteins_with_ligands_ids.append(uniprot_id)
-        #         print("proteins with ligands:", len(self.proteins_with_ligands_ids))
+        uniprot_seq, ligand_list = data['seq'], []
+        ligand_list = self.pdbbind_df[self.pdbbind_df['seq'] == uniprot_seq][["smiles", "value", "ic50",
+                                                                              "kd", "ki"]].values.tolist()
+        ligand_list = [(item[0], [item[1], item[2], item[3], item[4]]) for item in ligand_list]
 
-        return data["seq"], data["mut_info"], data["fitness"]
+        print("ligand_list", ligand_list)
+
+        return data["seq"], data["mut_info"], data["fitness"], ligand_list, None
 
     def __len__(self):
         return int(self._get("length"))
 
     def collate_fn(self, batch):
-        seqs, mut_info, fitness = zip(*batch)
+        seqs, mut_info, fitness, ligand_list, info = zip(*batch)
         
         plddt = self._get("plddt")
         if plddt is not None:
@@ -59,4 +55,4 @@ class MutationZeroShotDataset(LMDBDataset):
 
         labels = {"labels": torch.Tensor(fitness)}
 
-        return inputs, labels, None
+        return inputs, labels, ligand_list, info

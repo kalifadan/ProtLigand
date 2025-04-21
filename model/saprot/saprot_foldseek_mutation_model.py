@@ -113,7 +113,7 @@ class SaprotFoldseekMutationModel(SaprotBaseModel):
         os.remove(tmp_save_path + ".dbtype")
         return struc_seq
     
-    def forward(self, wild_type, seqs, mut_info, structure_content, structure_type, plddt):
+    def forward(self, wild_type, seqs, mut_info, structure_content, structure_type, plddt, ligands=None):
         device = self.device
         
         if getattr(self, "struc_seq", None) is None:
@@ -174,7 +174,32 @@ class SaprotFoldseekMutationModel(SaprotBaseModel):
         
         ori_inputs = self.tokenizer.batch_encode_plus(ori_seqs, return_tensors="pt", padding=True)
         ori_inputs = {k: v.to(device) for k, v in ori_inputs.items()}
-        ori_outputs = self.model(**ori_inputs)
+
+        # ori_outputs = self.model(**ori_inputs)
+
+        ori_outputs = self.model.esm(**ori_inputs)
+        hidden = ori_outputs[0]
+
+        # # Ligand-Protein Transformers
+        if [] not in ligands:
+            ligands_embeddings, ligands_labels = self.process_ligands(ligands)
+            ligands_embeddings = ligands_embeddings.squeeze(0)
+        else:
+            ligands_embeddings = self.ligand_generator(hidden[:, 0, :])
+
+        ligands_embeddings = self.ligand_proj(ligands_embeddings)  # [batch, ligand_dim] → [batch, hidden_dim]
+        ligands_embeddings = ligands_embeddings.unsqueeze(1).expand(-1, hidden.size(1), -1)  # Expand for attention
+
+        # Apply cross-attention (Protein as Query, Ligands as Key/Value)
+        attn_output, _ = self.cross_attention(
+            query=hidden,  # Protein embeddings
+            key=ligands_embeddings,
+            value=ligands_embeddings
+        )
+
+        hidden = hidden + attn_output  # Residual connection
+        ori_outputs['logits'] = self.model.lm_head(hidden)
+
         ori_probs = ori_outputs['logits'].softmax(dim=-1)
         
         if self.MSA_log_path is not None:
@@ -247,7 +272,7 @@ class SaprotFoldseekMutationModel(SaprotBaseModel):
 
         return torch.tensor(preds).to(ori_probs)
 
-    def loss_func(self, stage, outputs, labels, inputs=None, ligands=None):
+    def loss_func(self, stage, outputs, labels, inputs=None, ligands=None, info=None):
         fitness = labels['labels']
 
         # Update metrics

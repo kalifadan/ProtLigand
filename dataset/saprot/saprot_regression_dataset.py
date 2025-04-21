@@ -57,40 +57,11 @@ class SaprotRegressionDataset(LMDBDataset):
 		# Ligands Extraction
 		uniprot_id, ligand_list = entry['name'], []
 		ligand_list = self.pdbbind_df[self.pdbbind_df['uniprot_id'] == uniprot_id][["smiles", "value", "ic50",
-																					"kd", "ki"]].values.tolist()
+																					"kd", "ki", "type"]].values.tolist()
+		protein_type = [item[5] for item in ligand_list]
+		protein_type = "Unknown" if len(protein_type) == 0 else protein_type[0]
 		ligand_list = [(item[0], [item[1], item[2], item[3], item[4]]) for item in ligand_list]
-
-		if ligand_list and uniprot_id not in self.proteins_with_ligands_ids:
-			self.proteins_with_ligands_ids.append(uniprot_id)
-			print("proteins with ligands:", len(self.proteins_with_ligands_ids))
-
-		# if uniprot_id in self.ligands_dataset:
-		# 	print("got here:", uniprot_id)
-		# 	ligand_list = [(data_point['smi'], data_point['label']['ic50']) for data_point in
-		# 				   self.ligands_dataset[uniprot_id] if 'label' in data_point and 'ic50' in data_point['label']]
-		# 	print("ligand_list:", len(ligand_list))
-		#
-		# else:
-		# 	if uniprot_id not in self.proteins_without_ligands:
-		# 		best_match, best_score = self.find_most_similar(uniprot_id, self.fetch_uniprot_sequence(uniprot_id), self.protein_sequences)
-		# 		if best_score >= self.ligand_score_th:
-		# 			ligand_list = [(data_point['smi'], data_point['label']['ic50']) for data_point in
-		# 						   self.ligands_dataset[best_match] if
-		# 						   'label' in data_point and 'ic50' in data_point['label']]
-		# 			self.ligands_dataset[uniprot_id] = self.ligands_dataset[best_match]	  # cache the result for next iter
-		# 		else:
-		# 			self.proteins_without_ligands.append(uniprot_id)
-		#
-		# if index not in self.proteins_with_ligands_indexes and ligand_list:
-		# 	print("new protein received")
-		# 	self.proteins_with_ligands_indexes.append(index)
-		# 	print("proteins with ligands:", len(self.proteins_with_ligands_indexes))
-		#
-		# if not ligand_list:
-		# 	if self.proteins_with_ligands_indexes:
-		# 		new_index = random.sample(self.proteins_with_ligands_indexes, 1)[0]  # change to iterate pass
-		# 		print("new_index:", new_index)
-		# 		return self.__getitem__(new_index)
+		information_list = [uniprot_id, protein_type]
 
 		# Mask structure tokens
 		if self.mask_struc_ratio is not None:
@@ -122,7 +93,7 @@ class SaprotRegressionDataset(LMDBDataset):
 
 		tokens = self.tokenizer.tokenize(seq)[:self.max_length]
 		seq = " ".join(tokens)
-	
+
 		if self.min_clip is not None:
 			given_min, clip_value = self.min_clip
 			if entry['fitness'] < given_min:
@@ -133,17 +104,17 @@ class SaprotRegressionDataset(LMDBDataset):
 			entry['fitness'] = (entry['fitness'] - min_norm) / (max_norm - min_norm)
 				
 		label = entry['fitness']
-		return seq, label, ligand_list
+		return seq, label, ligand_list, information_list
 	
 	def __len__(self):
 		return int(self._get("length"))
 	
 	def collate_fn(self, batch):
-		seqs, labels, ligand_list = tuple(zip(*batch))
+		seqs, labels, ligand_list, information_list = tuple(zip(*batch))
 		labels = torch.tensor(labels)
 		labels = {"labels": labels}
 		
 		encoder_info = self.tokenizer.batch_encode_plus(seqs, return_tensors='pt', padding=True)
 		inputs = {"inputs": encoder_info}
 
-		return inputs, labels, ligand_list
+		return inputs, labels, ligand_list, information_list

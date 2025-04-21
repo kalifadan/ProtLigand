@@ -24,18 +24,6 @@ class SaprotClassificationModel(SaprotBaseModel):
         if coords is not None:
             inputs = self.add_bias_feature(inputs, coords)
 
-        # Ligand-Protein Transformer
-        # if [] not in ligands:
-        #     print("got ligands for protein!")
-        #     ligands_embeddings, ligands_labels = self.process_ligands(ligands)
-        #     ligands_embeddings = ligands_embeddings.squeeze(0)
-        #     # ligands_labels = torch.tensor(ligands_labels, dtype=torch.float32).to(self.model.device)
-        # else:
-        #     ligands_embeddings = self.default_ligand.unsqueeze(0)
-            # ligands_labels = self.default_ligand_label.unsqueeze(0)
-
-        # ligands_labels = self.label_adapter(ligands_labels)
-
         # If backbone is frozen, the embedding will be the average of all residues
         if self.freeze_backbone:
             repr = torch.stack(self.get_hidden_states(inputs, reduction="mean"))
@@ -46,16 +34,37 @@ class SaprotClassificationModel(SaprotBaseModel):
             logits = self.model.classifier.out_proj(x)
 
         else:
-            logits = self.model(**inputs).logits
-            # output = self.model.esm(**inputs)
-            # hidden = output[0]
-            # ligands_embeddings = ligands_embeddings.unsqueeze(1).expand(-1, hidden.size(1), -1)
-            # hidden = self.ligand_protein_transformer(torch.cat([hidden, ligands_embeddings], dim=-1))
-            # logits = self.model.classifier(hidden)
+            # logits = self.model(**inputs).logits
+
+            output = self.model.esm(**inputs)
+            hidden = output[0]
+
+            # Ligand-Protein Transformer
+            if [] not in ligands:
+                ligands_embeddings, ligands_labels = self.process_ligands(ligands)
+                ligands_embeddings = ligands_embeddings.squeeze(0)
+                # ligands_labels = torch.tensor(ligands_labels, dtype=torch.float32).to(self.model.device)
+            else:
+                # ligands_embeddings = self.default_ligand.unsqueeze(0)
+                # ligands_labels = self.default_ligand_label.unsqueeze(0)
+                ligands_embeddings = self.ligand_generator(hidden[:, 0, :])
+
+            ligands_embeddings = self.ligand_proj(ligands_embeddings)  # [batch, ligand_dim] → [batch, hidden_dim]
+            ligands_embeddings = ligands_embeddings.unsqueeze(1).expand(-1, hidden.size(1), -1)  # Expand for attention
+
+            # Apply cross-attention (Protein as Query, Ligands as Key/Value)
+            attn_output, _ = self.cross_attention(
+                query=hidden,  # Protein embeddings
+                key=ligands_embeddings,
+                value=ligands_embeddings
+            )
+
+            hidden = hidden + attn_output  # Residual connection
+            logits = self.model.classifier(hidden)
 
         return logits
 
-    def loss_func(self, stage, logits, labels, inputs=None, ligands=None):
+    def loss_func(self, stage, logits, labels, inputs=None, ligands=None, info=None):
         label = labels['labels']
         task_loss = cross_entropy(logits, label)
 

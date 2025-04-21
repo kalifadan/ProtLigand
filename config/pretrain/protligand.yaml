@@ -5,13 +5,13 @@ setting:
     WANDB_RUN_ID: ~
     CUDA_VISIBLE_DEVICES: 0,1,2,3
     MASTER_ADDR: 127.0.0.1
-    MASTER_PORT: 28228
+    MASTER_PORT: 38438
     WORLD_SIZE: 1
     NODE_RANK: 0
 #      WANDB_MODE: offline
   wandb_config:
     project: PreTraining
-    name: ProtLigand
+    name: ProtLigand-Final-PollingAttention-Cross-Attention
 
 model:
 #    Which model to use
@@ -24,12 +24,12 @@ model:
 #    Arguments to initialize the basic class AbstractModel
   lr_scheduler_kwargs:
     last_epoch: -1
-    init_lr: 1.0e-5
-    max_lr: 8.0e-5
+    init_lr: 2.0e-5
+    max_lr: 1.0e-4
     final_lr: 5.0e-5
-    warmup_steps: 5000
-    start_decay_after_n_steps: 20000  # 150000
-    end_decay_after_n_steps: 100000   # 1500000
+    warmup_steps: 10000
+    start_decay_after_n_steps: 30000
+    end_decay_after_n_steps: 70000
 #    Weather to use this scheduler or not
     on_use: True
 
@@ -37,7 +37,7 @@ model:
     betas: [0.9, 0.98]
     weight_decay: 0.01
 
-  save_path: weights/Pretrain/new_combine_embeddings_protligand.pt
+  save_path: weights/Pretrain/final_prot_ligand_model.pt
   load_prev_scheduler: false
   save_weights_only: false
 
@@ -62,9 +62,9 @@ dataset:
 
 #  Arguments to initialize Pytorch Lightning Trainer
 Trainer:
-  max_epochs: 8   # 100
-  max_steps: 100000  # 1000000
-  min_steps: 100000  # 1000000
+  max_epochs: 50
+  max_steps: 1000000
+  min_steps: 1000000
   log_every_n_steps: 1
   accelerator: gpu
   devices: 1
@@ -75,7 +75,7 @@ Trainer:
   logger: True
   enable_checkpointing: false
   num_sanity_val_steps: 0
-  val_check_interval: 1.0   # 100
+  val_check_interval: 1.0
   precision: 16
   limit_val_batches: 1.0
   limit_test_batches: 1.0

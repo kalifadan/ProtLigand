@@ -11,8 +11,25 @@ import pytorch_lightning as pl
 from utils.lr_scheduler import Esm2LRScheduler
 from torch import distributed as dist
 
-seed = 20000812     # 42
-random.seed(seed)
+# seed = 20000812
+# random.seed(seed)
+
+
+class AttentionPooling(nn.Module):
+    def __init__(self, hidden_size):
+        super().__init__()
+        self.attn = nn.Linear(hidden_size, 1)
+
+    def forward(self, x):
+        attn_weights = torch.softmax(self.attn(x) / (x.shape[-1] ** 0.5), dim=1)  # Scaling factor for stability
+        return (attn_weights * x).sum(dim=1)
+
+
+def initialize_weights(m):
+    if isinstance(m, nn.Linear):
+        torch.nn.init.xavier_uniform_(m.weight)
+        if m.bias is not None:
+            m.bias.data.fill_(0.01)
 
 
 class AbstractModel(pl.LightningModule):
@@ -56,10 +73,6 @@ class AbstractModel(pl.LightningModule):
 
         self.step = 0
         self.epoch = 0
-        
-        self.load_prev_scheduler = load_prev_scheduler
-        if from_checkpoint:
-            self.load_checkpoint(from_checkpoint, load_prev_scheduler)
 
         # ProtLigand Parameters
         self.ligand_tokenizer = AutoTokenizer.from_pretrained("pchanda/pretrained-smiles-pubchem10m")
@@ -77,55 +90,43 @@ class AbstractModel(pl.LightningModule):
 
         input_size = protein_hidden_size + ligand_hidden_size  # + 4
 
-        # self.ligand_generator = nn.Sequential(
-        #     nn.TransformerEncoder(
-        #         nn.TransformerEncoderLayer(d_model=protein_hidden_size, nhead=4, dim_feedforward=512, dropout=0.1,
-        #                                    batch_first=True), num_layers=1),
-        #     nn.Linear(protein_hidden_size, ligand_hidden_size)
-        # )
-
         self.max_ligands = 1       # 200
 
-        self.ligand_protein_transformer = nn.Sequential(
-            nn.TransformerEncoder(
-                nn.TransformerEncoderLayer(d_model=input_size, nhead=4,
-                                           dim_feedforward=512, dropout=0.1, batch_first=True), num_layers=1),
-            nn.Linear(input_size, protein_hidden_size)
-            # nn.Linear(input_size, 1)
+        self.default_ligand = nn.Parameter(torch.randn(ligand_hidden_size) * 0.01)
+
+        # Cross-attention module: Protein (Q) attends to Ligand (K, V)
+        self.cross_attention = torch.nn.MultiheadAttention(
+            embed_dim=self.model.config.hidden_size,  # Hidden size of protein embeddings
+            num_heads=4,  # Number of attention heads
+            batch_first=True
         )
 
-        self.default_ligand = nn.Parameter(torch.randn(ligand_hidden_size) * 0.01)
-        # self.default_ligand_label = nn.Parameter(torch.randn(4) * 0.01)
-        # self.label_adapter = nn.Linear(4, 4)
+        # Layer Normalization
+        # self.norm = torch.nn.LayerNorm(self.model.config.hidden_size)  # Normalize over the last dimension
+        self.attention_pooling = AttentionPooling(self.model.config.hidden_size)  # Use attention pooling
 
-        # self.ligand_generator = nn.Sequential(
-        #     nn.TransformerEncoder(
-        #         nn.TransformerEncoderLayer(d_model=protein_hidden_size, nhead=4, dim_feedforward=512, dropout=0.1,
-        #                                    batch_first=True), num_layers=2),
-        #     nn.Linear(protein_hidden_size, self.max_ligands * ligand_hidden_size)
-        # )
+        # Binding Affinity Prediction Head
+        self.binding_affinity_predictor = nn.Sequential(
+            nn.Linear(self.model.config.hidden_size, 512),
+            nn.ReLU(),
+            nn.Linear(512, 64),
+            nn.ReLU(),
+            nn.Linear(64, 1),
+        )
+        self.binding_affinity_predictor.apply(initialize_weights)
 
-        # self.ligand_generator = Sequential(
-        #     Linear(protein_hidden_size, protein_hidden_size * 2),
-        #     ReLU(),
-        #     Linear(protein_hidden_size * 2, ligand_hidden_size)
-        # )
+        self.ligand_proj = torch.nn.Linear(ligand_hidden_size, protein_hidden_size)
 
-        # Discriminator to distinguish real vs fake ligand embeddings
-        # self.ligand_discriminator = Sequential(
-        #     Linear(ligand_hidden_size, 128),
-        #     ReLU(),
-        #     Linear(128, 64),
-        #     ReLU(),
-        #     Linear(64, 1),
-        #     Sigmoid()  # Output probability of real ligand vs. generated ligand
-        # )
+        self.ligand_generator = nn.Sequential(
+            nn.TransformerEncoder(
+                nn.TransformerEncoderLayer(d_model=protein_hidden_size, nhead=4, dim_feedforward=512, dropout=0.1,
+                                           batch_first=True), num_layers=2),
+            nn.Linear(protein_hidden_size, ligand_hidden_size)
+        )
 
-        # self.ic50_predictor = Linear(protein_hidden_size + ligand_hidden_size, 1)
-
-        # self.ic50_predictor = nn.Sequential(
-        #     nn.TransformerEncoder(nn.TransformerEncoderLayer(protein_hidden_size + ligand_hidden_size, 2), 2),
-        #     nn.Linear(protein_hidden_size + ligand_hidden_size, 1))
+        self.load_prev_scheduler = load_prev_scheduler
+        if from_checkpoint:
+            self.load_checkpoint(from_checkpoint, load_prev_scheduler)
 
     @abc.abstractmethod
     def initialize_model(self) -> None:
@@ -155,7 +156,7 @@ class AbstractModel(pl.LightningModule):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def loss_func(self, stage: str, outputs, labels, inputs=None, ligands=None) -> torch.Tensor:
+    def loss_func(self, stage: str, outputs, labels, inputs=None, ligands=None, info=None) -> torch.Tensor:
         """
 
         Args:
@@ -172,6 +173,7 @@ class AbstractModel(pl.LightningModule):
         raise NotImplementedError
 
     def process_ligands(self, ligands_info):
+        # print("number of given ligands:", max(len(ligands) for ligands in ligands_info))
         batch_size = len(ligands_info)
         max_ligands = min(self.max_ligands, max(len(ligands) for ligands in ligands_info))
         embedding_dim = self.ligand_model.config.hidden_size
@@ -204,154 +206,6 @@ class AbstractModel(pl.LightningModule):
                 ligand_embeddings[i, :ligand_representations.size(0)] = ligand_representations
 
         return ligand_embeddings, all_labels
-
-    def process_ligands_embedding_only(self, ligands_info):
-        batch_size = len(ligands_info)
-        max_ligands = min(self.max_ligands, max(len(ligands) for ligands in ligands_info))
-        embedding_dim = self.ligand_model.config.hidden_size
-        ligand_embeddings = torch.zeros(batch_size, max_ligands, embedding_dim).to(device=self.ligand_model.device)
-
-        for i, ligands in enumerate(ligands_info):
-            smiles_list = []
-
-            num_ligands_to_select = min(self.max_ligands, len(ligands))
-            ligands = random.sample(ligands, num_ligands_to_select)
-            # ligands = ligands[:num_ligands_to_select]
-
-            for smiles in ligands:
-                smiles_list.append(smiles)
-
-            if smiles_list:
-                ligand_inputs = self.ligand_tokenizer(smiles_list, return_tensors="pt", padding=True,
-                                                      truncation=True).to(self.model.device)
-                ligands_outputs = self.ligand_model(**ligand_inputs, output_hidden_states=True)
-                final_hidden_state = ligands_outputs.hidden_states[-1].to(self.model.device)
-                ligand_representations = final_hidden_state.mean(dim=1)
-                ligand_embeddings[i, :ligand_representations.size(0)] = ligand_representations
-
-        return ligand_embeddings
-
-    def protein_new_ligand_loss(self, proteins, ligands):
-        # Protein Embeddings
-        protein_embeddings = torch.stack(self.get_hidden_states(proteins, reduction="mean"))
-
-        # Protein-Ligand Loss
-        if [] not in ligands:
-            ligands_embeddings, ligands_labels = self.process_ligands(ligands)
-            ligands_embeddings = ligands_embeddings.squeeze(0)
-            ligands_labels = torch.tensor(ligands_labels, dtype=torch.float32).to(self.model.device).squeeze(0)
-
-            total_generator_ic50_loss = 0
-            num_ligands = ligands_labels.size(0)
-
-            for i in range(num_ligands):
-                generated_ic50 = self.ic50_predictor(
-                    torch.cat([protein_embeddings, ligands_embeddings[i:(i + 1)]], dim=-1))
-                generator_ic50_loss = torch.nn.functional.mse_loss(generated_ic50, ligands_labels[i:(i + 1)].unsqueeze(1))
-                total_generator_ic50_loss += generator_ic50_loss
-
-            generator_loss = total_generator_ic50_loss / num_ligands
-
-        else:
-            generator_loss = None
-
-        return generator_loss
-
-    def protein_embeddings_sim_ligand_loss(self, proteins, ligands):
-        # Protein Embeddings
-        protein_embeddings = torch.stack(self.get_hidden_states(proteins, reduction="mean"))
-
-        # Protein-Ligand Loss
-        if [] not in ligands:
-            ligands_embeddings = self.process_ligands_embedding_only(ligands)
-            ligands_embeddings = ligands_embeddings.squeeze(0)
-
-            # total_generator_embedding_loss = 0
-            num_ligands = ligands_embeddings.size(0)
-
-            num_generated = min(self.max_ligands, num_ligands)
-            generated_embeddings = self.ligand_generator(protein_embeddings)
-            generated_embeddings = generated_embeddings.view(protein_embeddings.shape[0], self.max_ligands, -1)[:num_generated]   # (batch_size, self.max_ligands, ligand_hidden_size)
-
-            # Compute cosine similarity between all real ligands and generated ligands
-            cosine_sim = nn.functional.cosine_similarity(generated_embeddings.unsqueeze(0), ligands_embeddings.unsqueeze(1), dim=-1)
-
-            # Compute loss: 1 - mean cosine similarity
-            generator_loss = 1 - cosine_sim.mean()
-
-            # for i in range(num_ligands):
-            #
-            #     generator_embedding_loss = 1 - nn.functional.cosine_similarity(generated_embeddings,
-            #                                                                    ligands_embeddings[i:(i + 1)]).mean()
-            #     total_generator_embedding_loss += generator_embedding_loss
-            #
-            # generator_loss = total_generator_embedding_loss / num_ligands
-
-        else:
-            generator_loss = None
-
-        return generator_loss
-
-    def protein_ligand_loss(self, proteins, ligands):
-        # Protein Embeddings
-        protein_embeddings = torch.stack(self.get_hidden_states(proteins, reduction="mean"))
-
-        # Protein-Ligand Loss
-        if [] not in ligands:
-            ligands_embeddings, ligands_labels = self.process_ligands(ligands)
-            ligands_embeddings = ligands_embeddings.squeeze(0)
-            is_real = True
-        else:  # Generate ligands if unknown
-            ligands_embeddings = self.ligand_generator(protein_embeddings)
-            ligands_labels = [[self.ic50_predictor(torch.cat([protein_embeddings, ligands_embeddings], dim=-1))]]
-            # TODO: ligands_labels is not in use for this case!!!
-            is_real = False
-
-        ligands_labels = torch.tensor(ligands_labels, dtype=torch.float32).to(self.model.device).squeeze(0)
-
-        # GAN Adversarial Loss
-        real_labels = torch.ones_like(ligands_labels).to(self.model.device).unsqueeze(1)
-        fake_labels = torch.zeros(1).to(self.model.device)
-
-        # We ensure that the discriminator's loss doesn't affect the generator's weights during the backward pass
-        discriminator_real_loss = nn.functional.binary_cross_entropy_with_logits(
-            self.ligand_discriminator(ligands_embeddings.detach()), real_labels
-        ).mean() if is_real else 0
-
-        discriminator_fake_loss = nn.functional.binary_cross_entropy_with_logits(
-            self.ligand_discriminator(ligands_embeddings.detach()).squeeze(0), fake_labels
-        ) if not is_real else 0
-
-        # Generator loss based on embedding similarity and IC50 prediction
-        if is_real:
-            # Loop to generate multiple ligands
-            total_generator_embedding_loss = 0
-            total_generator_ic50_loss = 0
-            num_ligands = ligands_labels.size(0)
-
-            for i in range(num_ligands):
-                generated_embeddings = self.ligand_generator(protein_embeddings)
-                generator_embedding_loss = 1 - nn.functional.cosine_similarity(generated_embeddings,
-                                                                               ligands_embeddings[i:(i + 1)]).mean()
-                generated_ic50 = self.ic50_predictor(
-                    torch.cat([protein_embeddings, ligands_embeddings[i:(i + 1)]], dim=-1))
-
-                generator_ic50_loss = torch.clamp(torch.nn.functional.mse_loss(generated_ic50,  # 40 is the max mse
-                                                                               ligands_labels[i:(i + 1)].unsqueeze(
-                                                                                   1)) / 40, min=0, max=1)
-                total_generator_embedding_loss += generator_embedding_loss
-                total_generator_ic50_loss += generator_ic50_loss
-
-            generator_embedding_loss = total_generator_embedding_loss / num_ligands
-            generator_ic50_loss = total_generator_ic50_loss / num_ligands
-            generator_loss = generator_embedding_loss + generator_ic50_loss
-
-        else:  # Ensures that the generator tries to fool the discriminator
-            generator_loss = torch.nn.functional.binary_cross_entropy_with_logits(
-                self.ligand_discriminator(ligands_embeddings).squeeze(0), torch.ones(1).to(self.model.device)
-            )
-
-        return generator_loss, discriminator_real_loss, discriminator_fake_loss
 
     @staticmethod
     def load_weights(model, weights):
@@ -398,26 +252,45 @@ class AbstractModel(pl.LightningModule):
         self.epoch += 1
 
     def training_step(self, batch, batch_idx):
-        inputs, labels, ligands = batch
+        inputs, labels, ligands, info = batch
         outputs = self(**inputs, ligands=ligands)
-        loss = self.loss_func('train', outputs, labels, inputs, ligands=ligands)
+        loss = self.loss_func('train', outputs, labels, inputs, ligands=ligands, info=info)
         return loss
     
     def validation_step(self, batch, batch_idx):
-        inputs, labels, ligands = batch
+        inputs, labels, ligands, info = batch
         outputs = self(**inputs, ligands=ligands)
-        loss = self.loss_func('valid', outputs, labels, inputs, ligands=ligands)
+        loss = self.loss_func('valid', outputs, labels, inputs, ligands=ligands, info=info)
         return loss
 
     def test_step(self, batch, batch_idx):
-        inputs, labels, ligands = batch
+        inputs, labels, ligands, info = batch
         outputs = self(**inputs, ligands=ligands)
-        loss = self.loss_func('test', outputs, labels, inputs, ligands=ligands)
+        loss = self.loss_func('test', outputs, labels, inputs, ligands=ligands, info=info)
         return loss
 
     def load_checkpoint(self, from_checkpoint, load_prev_scheduler):
         state_dict = torch.load(from_checkpoint, map_location=self.device)
         self.load_weights(self.model, state_dict["model"])
+
+        # Load additional modules dynamically
+        # ("ligand_protein_transformer", self.ligand_protein_transformer),
+        # ("binding_affinity_predictor", self.binding_affinity_predictor),
+        for key, module in [
+            ("cross_attention", self.cross_attention),
+            ("ligand_proj", self.ligand_proj),
+        ]:
+            if key in state_dict:
+                module.load_state_dict(state_dict[key])
+
+        # Restore nn.Parameter (default_ligand)
+        if "default_ligand" in state_dict:
+            self.default_ligand = state_dict["default_ligand"]
+
+        # TODO: ADD TO PARAMETERS!
+        generator_path = "weights/Pretrain/final_ligand_generator_model.pt"
+        generator_state_dict = torch.load(generator_path, map_location=self.device)
+        self.ligand_generator.load_state_dict(generator_state_dict["ligand_generator"])
 
         if load_prev_scheduler:
             try:

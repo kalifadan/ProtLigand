@@ -46,7 +46,7 @@ class SaprotContactModel(SaprotBaseModel):
 
         return metric_dict
 
-    def forward(self, inputs):
+    def forward(self, inputs, ligands=None):
         # inputs["output_hidden_states"] = True
         # outputs = self.model.esm(**inputs)
         #
@@ -72,7 +72,7 @@ class SaprotContactModel(SaprotBaseModel):
 
         return logits
 
-    def loss_func(self, stage, logits, labels):
+    def loss_func(self, stage, logits, labels, inputs=None, ligands=None, info=None):
         lengths = labels["lengths"]
         targets = labels["targets"].to(logits.device)
         loss = cross_entropy(logits.view(-1, logits.size(-1)), targets.flatten(), ignore_index=-1)

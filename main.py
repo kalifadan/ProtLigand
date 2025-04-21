@@ -19,7 +19,7 @@ def download_alphafold_pdb_v4(uniprot_id, save_path):
     else:
         print(f"Failed to download AlphaFold PDB for {uniprot_id}. Status code: {response.status_code}")
 
-#
+
 # ligands_filepath = "LMDB/PDBBind/LP_PDBBind_edited.csv"
 # pdbbind_df = pd.read_csv(ligands_filepath, index_col=0)
 # pdbbind_df = pdbbind_df.dropna(subset=["smiles", "uniprot_id"])
@@ -40,10 +40,8 @@ def download_alphafold_pdb_v4(uniprot_id, save_path):
 #     else:
 #         raise ValueError(f"Error downloading PDB file for ID {pdb_id}: {response.status_code}")
 #
-#
 # download_pdb("8ac8")
 
-#
 # pdb_path = "example/AF-P30405-F1-model_v4.pdb"  # ""example/8ac8.cif"
 #
 # # Extract the "A" chain from the pdb file and encode it into a struc_seq
@@ -55,8 +53,6 @@ def download_alphafold_pdb_v4(uniprot_id, save_path):
 # print(f"seq: {seq}")
 # print(f"foldseek_seq: {foldseek_seq}")
 # print(f"combined_seq: {combined_seq}")
-
-
 
 import os
 import lmdb
@@ -76,9 +72,10 @@ df = df[df["uniprot_id"].isin(valid_uniprot_ids)]
 
 # Split dataset by unique protein IDs
 unique_proteins = list(df["uniprot_id"].unique())
+print("nubmer of unique proteins:", len(unique_proteins))
 random.shuffle(unique_proteins)
 
-split_idx = int(len(unique_proteins) * 0.9)
+split_idx = int(len(unique_proteins) * 0.95)
 train_ids = set(unique_proteins[:split_idx])
 val_ids = set(unique_proteins[split_idx:])
 
@@ -86,7 +83,7 @@ train_df = df[df["uniprot_id"].isin(train_ids)]
 val_df = df[df["uniprot_id"].isin(val_ids)]
 
 print(f"Train size: {len(train_df)}, Validation size: {len(val_df)}")
-
+print(f"Total size: {len(train_df) + len(val_df)}")
 # Function to save data to LMDB
 
 
@@ -105,21 +102,26 @@ def save_to_lmdb(df, lmdb_path):
 
             entry = {
                 "uniprot_id": uniprot_id,
-                "sequence": seq,
+                "sequence": combined_seq,
+                "original_seq": seq,
+                "foldseek_seq": foldseek_seq,
                 "ligand": ligand,
                 "binding_affinity": ba_value
             }
-            txn.put(str(ii).encode(), json.dumps(entry).encode())
+
+            new_key = f"{ii}".encode("utf-8")
+
+            txn.put(new_key, json.dumps(entry).encode())
             ii += 1
             print("current index:", ii)
 
-        # txn.put(b"length", str(len(df)).encode())
+        txn.put(b"length", str(len(df)).encode())
     env.close()
     print(f"Saved {len(df)} entries to {lmdb_path}")
 
 
-# save_to_lmdb(val_df, "final_pdbbind_val.lmdb")
-# save_to_lmdb(train_df, "final_pdbbind_train.lmdb")
+# save_to_lmdb(val_df, "pdbbind_val.lmdb")
+# save_to_lmdb(train_df, "pdbbind_train.lmdb")
 
 
 import lmdb
@@ -219,7 +221,7 @@ def load_human_ppi(lmdb_paths):
     merged_data = []
 
     for lmdb_path in lmdb_paths:
-        env = lmdb.open(lmdb_path, readonly=True, lock=False)
+        env = lmdb.open(lmdb_path, readonly=True, lock=False, map_size=int(5e9))
         with env.begin() as txn:
             cursor = txn.cursor()
             for key, value in cursor:
@@ -231,7 +233,7 @@ def load_human_ppi(lmdb_paths):
                 merged_data.append(entry)
         env.close()
 
-    print(f"Loaded {len(merged_data)} total PPI pairs.")
+    print(f"Loaded {len(merged_data)} total.")
     return merged_data
 
 
@@ -246,7 +248,7 @@ def save_lmdb(data, output_lmdb_path):
     print(f"Saved {len(data)} entries to {output_lmdb_path}")
 
 
-def filter_and_resplit_human_ppi(lmdb_paths, ligand_df, output_dir, train_ratio=0.8, val_ratio=0.1, test_ratio=0.1):
+def filter_and_resplit_human_ppi(lmdb_paths, ligand_df, output_dir, train_ratio=0.7, val_ratio=0.15, test_ratio=0.15):
     """
     Merges, filters, and splits the HumanPPI dataset based on ligand protein IDs.
 
@@ -292,9 +294,11 @@ def filter_and_resplit_human_ppi(lmdb_paths, ligand_df, output_dir, train_ratio=
 # Example Usage
 ligand_df = df
 lmdb_paths = [
-    "LMDB/Thermostability/foldseek/train",
-    "LMDB/Thermostability/foldseek/valid",
-    "LMDB/Thermostability/foldseek/test"
+    "LMDB/DeepLoc/cls10/foldseek/train",
+    "LMDB/DeepLoc/cls10/foldseek/valid",
+    "LMDB/DeepLoc/cls10/foldseek/test"
 ]
-filter_and_resplit_human_ppi(lmdb_paths, ligand_df, "LMDB/Thermostability/ligands")
+filter_and_resplit_human_ppi(lmdb_paths, ligand_df, "LMDB/DeepLoc/cls10/ligands")
 
+# val_lmdb = "pdbbind_val.lmdb"
+# read_from_lmdb("pdbbind_train.lmdb")

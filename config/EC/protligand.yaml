@@ -5,12 +5,12 @@ setting:
     WANDB_RUN_ID: ~
     CUDA_VISIBLE_DEVICES: 0,1,2,3
     MASTER_ADDR: localhost
-    MASTER_PORT: 20182
+    MASTER_PORT: 42188
     WORLD_SIZE: 1
     NODE_RANK: 0
   wandb_config:
     project: EC
-    name: ProtLigand-Generator-PDBBind-StaticRandom-AllLables
+    name: New-ProtLigand-Cross-Attention-With-Generated-Ligands
 
 model:
 #    Which model to use
@@ -32,7 +32,9 @@ model:
     betas: [0.9, 0.98]
     weight_decay: 0.01
 
-  save_path: weights/EC/ProtLigand_1.pt
+  from_checkpoint: weights/Pretrain/final_prot_ligand_model.pt
+
+  save_path: weights/EC/prot_ligand_final.pt
 
 
 dataset:
@@ -53,7 +55,7 @@ dataset:
 
 #  Arguments to initialize Pytorch Lightning Trainer
 Trainer:
-  max_epochs: 1
+  max_epochs: 100
   log_every_n_steps: 1
   strategy:
     find_unused_parameters: True
@@ -63,6 +65,6 @@ Trainer:
   accelerator: gpu
   devices: 4
   num_nodes: 1
-  accumulate_grad_batches: 16
+  accumulate_grad_batches: 4
   precision: 16
   num_sanity_val_steps: 0
