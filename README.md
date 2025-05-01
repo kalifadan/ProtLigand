@@ -1,55 +1,7 @@
-# SaProt: Protein Language Modeling with Structure-aware Vocabulary (AA+3Di)
+# Beyond the Leaderboard: Unveiling Biological Insights via a Protein-Ligand Learning Framework
+## Dan Kalifa, Kira Radinsky, Eric Horvitz
 
-<a href="https://www.biorxiv.org/content/10.1101/2023.10.01.560349v3"><img src="https://img.shields.io/badge/Paper-bioRxiv-green" style="max-width: 100%;"></a>
-<a href="https://huggingface.co/westlake-repl/SaProt_650M_AF2"><img src="https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-red?label=Model" style="max-width: 100%;"></a>
-<a href="https://portal.valencelabs.com/blogs/post/saprot-protein-language-modeling-with-structure-aware-vocabulary-uyLPrUZqyDF60Yr" alt="blog"><img src="https://img.shields.io/badge/Blog-Portal-violet" /></a> 
-<a href="https://zhuanlan.zhihu.com/p/664754366" alt="zhihu"><img src="https://img.shields.io/badge/Zhihu-知乎-blue" /></a> 
-
-[//]: # (##### 🔴 [Note: SaProt requires structural &#40;SA token&#41; input for optimal performance. AA-sequence-only mode works but must be finetuned - frozen embeddings work only for SA, not AA sequences! With structural input, SaProt surpasses ESM2 in most tasks.]&#40;https://github.com/westlake-repl/SaProt?tab=readme-ov-file#saprot-protein-language-modeling-with-structure-aware-vocabulary-aa3di&#41;)
-
-The repository is an official implementation of [SaProt: Protein Language Modeling with Structure-aware Vocabulary](https://openreview.net/forum?id=6MRm3G4NiU).
-
-If you have any question about the paper or the code, feel free to raise an issue!
-
-> The laboratory is hiring research assistants, interns, doctoral students, and postdoctoral researchers. Please contact the corresponding author for details.
->
->实验室招聘科研助理，实习生，博士生和博士后，请联系通讯作者
-
-<details open><summary><b>Table of contents</b></summary>
-
-- [News](#News)
-- [Overview](#Overview)
-- [Environment installation](#Environment-installation)
-- [Prepare the SaProt model](#Prepare-the-SaProt-model)
-  - [Model checkpoints](#Model-checkpoints)
-  - [New experimental results](#New-experimental-results)
-- [Load SaProt](#Load-SaProt)
-  - [Hugging Face model](#Hugging-Face-model)
-  - [Load SaProt using esm repository](#Load-SaProt-using-esm-repository)
-- [Convert protein structure into structure-aware sequence](#Convert-protein-structure-into-structure-aware-sequence)
-- [Predict mutational effect](#Predict-mutational-effect)
-- [Get protein embeddings](#Get-protein-embeddings)
-- [Perform protein inverse folding](#Perform-protein-inverse-folding)
-- [Prepare dataset](#Prepare-dataset)
-  - [Pre-training dataset](#Pre-training-dataset)
-  - [Downstream tasks](#Downstream-tasks)
-- [Fine-tune SaProt](#Fine-tune-SaProt)
-- [Evaluate zero-shot performance](#Evaluate-zero-shot-performance)
-- [Citation](#Citation)
-</details>
-
-## News
-- **2024/12/09:** We released Saprot 1.3B version! Download it from [HuggingFace](https://huggingface.co/westlake-repl/SaProt_1.3B_AF2)
-and see the experimental results [below](#SaProt-650M-vs-13B).
-- **2024/08/14:** over 20 outstanding researchers in Biology&Bioinformatics have joined SaprotHub as co-authors. [Joining us and contribute](https://github.com/westlake-repl/SaprotHub).
-- **2024/05/13:** We developed SaprotHub to make protein language model training accessible to all biologists. [Go](https://github.com/westlake-repl/SaprotHub).
-- **2024/05/13:** SaProt ranked **#1st**  on the public ProteinGym benchmark in April2024, while other top-ranked models are  hybrid and mutation-specialized model.🎉🎉🎉! See [here](#proteingym-benchmark).
-- **2024/04/18:** We found a slight difference for EC and GO evaluation and updated the re-evaluated results (see [issue #23](https://github.com/westlake-repl/SaProt/issues/23) for details).
-- **2024/03/08:** We uploaded a simple function to make zero-shot prediction of mutational effect (see [example](#predict-mutational-effect)
-below).
-- **2024/01/17:** Our paper has been accepted as **ICLR 2024 spotlight** 🎉🎉🎉!
-- **2023/10/30:** We release a pre-trained [SaProt 35M model](https://huggingface.co/westlake-repl/SaProt_35M_AF2) and a [35M residue-sequence-only version of SaProt](https://huggingface.co/westlake-repl/SaProt_35M_AF2_seqOnly) (for comparison)! The residue-sequence-only SaProt (without 3Di token) performs highly similar to the official ESM-2 35M model. (see Results below).
-- **2023/10/30:** We released the results by using ESMFold structures. See Table below
+The repository is an official implementation of the paper "Beyond the Leaderboard: Unveiling Biological Insights via a Protein-Ligand Learning Framework".
 
 ## Overview
 ![](figures/pipeline.png)
