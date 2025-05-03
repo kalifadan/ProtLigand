@@ -4,7 +4,7 @@
 The repository is the official implementation of the paper "Beyond the Leaderboard: Unveiling Biological Insights via a Protein-Ligand Learning Framework".
 
 ## Overview
-![](figures/ProtLigand.pdf)
+![](figures/pipeline.png)
 
 ## Environment installation
 ### Create a virtual environment
