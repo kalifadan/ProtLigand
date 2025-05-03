@@ -118,4 +118,4 @@ class ProtLigandFoldseekDataset(LMDBDataset):
 		encoder_info = self.tokenizer.batch_encode_plus(seqs, return_tensors='pt', padding=True)
 		inputs = {"inputs": encoder_info}
 
-		return inputs, labels, ligand_list
+		return inputs, labels, ligand_list, None

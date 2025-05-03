@@ -73,7 +73,6 @@ class GeneratorFoldseekDataset(LMDBDataset):
 		ids = self.tokenizer.encode(seq, add_special_tokens=False)
 		tokens = self.tokenizer.convert_ids_to_tokens(ids)
 
-		# # TODO: ONLY FOR LIGAND GENERATOR
 		labels = torch.full((len(tokens) + 2,), -1, dtype=torch.long)
 		return " ".join(tokens), labels, ligand_list
 	
@@ -112,4 +111,4 @@ class GeneratorFoldseekDataset(LMDBDataset):
 		encoder_info = self.tokenizer.batch_encode_plus(seqs, return_tensors='pt', padding=True)
 		inputs = {"inputs": encoder_info}
 
-		return inputs, labels, ligand_list
+		return inputs, labels, ligand_list, None

@@ -10,7 +10,7 @@ setting:
     NODE_RANK: 0
   wandb_config:
     project: GO_MF
-    name: Pretrained-ProtLigand-Cross-Attention
+    name: ProtLigand-Cross-Attention-With-Generated-Ligands-Large
 
 model:
 #    Which model to use
@@ -32,9 +32,8 @@ model:
     betas: [0.9, 0.98]
     weight_decay: 0.01
 
-  from_checkpoint: weights/Pretrain/final_protligand_cross_attention.pt
-
-  save_path: weights/GO/MF/new_prot_ligand.pt
+  from_checkpoint: weights/Pretrain/final_prot_ligand_model_large.pt
+  save_path: weights/GO/MF/prot_ligand_large.pt
 
 
 dataset:

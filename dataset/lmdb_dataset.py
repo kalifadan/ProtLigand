@@ -44,33 +44,6 @@ class LMDBDataset(pl.LightningDataModule):
         self.env = None
         self.operator = None
 
-        # with open("LMDB/SIU/protein_sequences.pkl", 'rb') as f:
-        #     self.protein_sequences = pickle.load(f)
-        #
-        # self.ligand_score_th = 0.80
-
-        # ligands_filepath = "LMDB/SIU/final_dic.pkl"
-        # with open(ligands_filepath, 'rb') as f:
-        #     self.ligands_dataset = pickle.load(f)
-
-        # ------------------------------------------------------------------------------------------------------------
-
-        ligands_filepath = "LMDB/PDBBind/LP_PDBBind_edited.csv"
-        self.pdbbind_df = pd.read_csv(ligands_filepath, index_col=0)
-        self.pdbbind_df = self.pdbbind_df.dropna(subset=["smiles", "uniprot_id"])
-        self.pdbbind_df[["ic50", "ki", "kd"]] = self.pdbbind_df["kd/ki"].apply(lambda x: pd.Series(self.parse_kd_ki(x))).fillna(0)
-        self.pdbbind_df[["ic50", "ki", "kd"]] = self.pdbbind_df[["ic50", "ki", "kd"]].apply(self.log_normalize)
-
-        valid_uniprot_ids = []
-        for filename in os.listdir("example"):
-            if ".pdb" in filename:
-                uniprot_id = filename.split("-")[1]
-                valid_uniprot_ids.append(uniprot_id)
-        print("Number of valid unique proteins:", len(list(set(valid_uniprot_ids))))
-
-        self.pdbbind_df = self.pdbbind_df[self.pdbbind_df["uniprot_id"].isin(valid_uniprot_ids)]
-        print("Dataset Size:", len(self.pdbbind_df))
-
     def is_initialized(self):
         return self.env is not None
     
@@ -189,35 +162,3 @@ class LMDBDataset(pl.LightningDataModule):
     def log_normalize(self, values):
         return np.log10(values + 1e-8)  # Adding small epsilon to avoid log(0)
 
-    def parse_kd_ki(self, value):
-        """Extract IC50, Ki, and Kd values from the 'kd/ki' column and convert to nM."""
-        ic50, ki, kd = None, None, None  # Default values if not found
-
-        if pd.isna(value):
-            return ic50, ki, kd  # Return None values if missing
-
-        # Regex pattern to capture IC50, Ki, or Kd values with their units (nM or µM)
-        match = re.findall(r"(IC50|Ki|Kd)\s*=\s*(\d*\.?\d+)\s*([numµmM]+)", value, re.IGNORECASE)
-
-        for label, num, unit in match:
-            num = float(num)  # Convert number to float
-
-            unit = unit.lower().replace("µ", "u")  # Convert µM to uM
-            if unit == "um":  # Micromolar (µM/uM) to nanomolar (nM)
-                num *= 1000
-            elif unit == "mm":  # Millimolar (mM) to nanomolar (nM)
-                num *= 1_000_000
-            elif unit == "nm":  # Nanomolar (nM) stays the same
-                pass
-            else:
-                print(f"Warning: Unrecognized unit '{unit}' in value '{value}'")
-
-            # Assign the value based on the type
-            if label == "IC50":
-                ic50 = num
-            elif label == "Ki":
-                ki = num
-            elif label == "Kd":
-                kd = num
-
-        return ic50, ki, kd

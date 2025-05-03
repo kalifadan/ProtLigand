@@ -3,14 +3,14 @@ setting:
   os_environ:
     WANDB_API_KEY: ~
     WANDB_RUN_ID: ~
-    CUDA_VISIBLE_DEVICES: 0   # ,1,2,3
+    CUDA_VISIBLE_DEVICES: 0,1,2,3
     MASTER_ADDR: localhost
-    MASTER_PORT: 48548
+    MASTER_PORT: 48542
     WORLD_SIZE: 1
     NODE_RANK: 0
   wandb_config:
     project: HumanPPI
-    name: New-ProtLigand-Cross-Attention-With-Generated-Ligands
+    name: ProtLigand-Cross-Attention-With-Generated-Ligands-Large
 
 model:
 #    Which model to use
@@ -31,24 +31,17 @@ model:
     betas: [0.9, 0.98]
     weight_decay: 0.01
 
-## BEST MODEL - PROTLIGAND
-#  test_result_path: output/HumanPPI/protligand_cross_attention.tsv
-#  from_checkpoint: weights/HumanPPI/protein_ligand_generator_pdbbind_new.pt
-
-  # BEST MODEL - SAPROT
-  test_result_path: output/HumanPPI/SaProt_650M_AF2.tsv
-  from_checkpoint: weights/HumanPPI/SaProt_650M_AF2.pt
-
-  # Training
-#  from_checkpoint: weights/Pretrain/final_prot_ligand_model.pt
-#  save_path: weights/HumanPPI/protein_ligand_generator_5.pt
+  # test_result_path: output/HumanPPI/ProtLigand.tsv  - Use to produce probs of the test set (e.g., for p-value)
+  from_checkpoint: weights/Pretrain/final_prot_ligand_model_large.pt
+  load_generator: weights/Pretrain/ligand_generator_model_with_decoder_big.pt
+  save_path: weights/HumanPPI/protein_ligand_generator_large.pt
 
 dataset:
 #    Arguments to initialize the basic class LMDBDataset
   dataset_py_path: saprot/saprot_ppi_dataset
   dataloader_kwargs:
     batch_size: 1
-    num_workers: 1    # 4
+    num_workers: 4
 
   train_lmdb: LMDB/HumanPPI/foldseek/train
   valid_lmdb: LMDB/HumanPPI/foldseek/valid
@@ -62,7 +55,7 @@ dataset:
 
 #  Arguments to initialize Pytorch Lightning Trainer
 Trainer:
-  max_epochs: 0   # 20
+  max_epochs: 20
   log_every_n_steps: 1
   strategy:
     find_unused_parameters: True
@@ -70,7 +63,7 @@ Trainer:
   enable_checkpointing: false
   val_check_interval: 0.1
   accelerator: gpu
-  devices: 1    # 4
+  devices: 4
   num_nodes: 1
   accumulate_grad_batches: 16
   precision: 16

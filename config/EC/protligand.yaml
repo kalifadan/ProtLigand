@@ -10,7 +10,7 @@ setting:
     NODE_RANK: 0
   wandb_config:
     project: EC
-    name: New-ProtLigand-Cross-Attention-With-Generated-Ligands
+    name: New-ProtLigand-Cross-Attention-With-Generated-Ligands-Large
 
 model:
 #    Which model to use
@@ -32,9 +32,9 @@ model:
     betas: [0.9, 0.98]
     weight_decay: 0.01
 
-  from_checkpoint: weights/Pretrain/final_prot_ligand_model.pt
-
-  save_path: weights/EC/prot_ligand_final.pt
+  from_checkpoint: weights/Pretrain/final_prot_ligand_model_large.pt
+  load_generator: weights/Pretrain/ligand_generator_model_with_decoder_big.pt
+  save_path: weights/EC/prot_ligand_final_large.pt
 
 
 dataset:
