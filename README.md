@@ -1,7 +1,7 @@
 # Beyond the Leaderboard: Unveiling Biological Insights via a Protein-Ligand Learning Framework
 ## Dan Kalifa, Kira Radinsky, Eric Horvitz
 
-The repository is an official implementation of the paper "Beyond the Leaderboard: Unveiling Biological Insights via a Protein-Ligand Learning Framework".
+The repository is the official implementation of the paper "Beyond the Leaderboard: Unveiling Biological Insights via a Protein-Ligand Learning Framework".
 
 ## Overview
 ![](figures/pipeline.png)
