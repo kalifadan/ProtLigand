@@ -34,6 +34,7 @@ model:
 
   # test_result_path: output/Thermostability/ProtLigand.tsv  - Use to produce probs of the test set (e.g., for p-value)
   from_checkpoint: weights/Pretrain/final_prot_ligand_model_large.pt
+  load_generator: weights/Pretrain/ligand_generator_model_with_decoder_big.pt
   save_path: weights/Thermostability/prot_ligand_large.pt
 
 dataset:
