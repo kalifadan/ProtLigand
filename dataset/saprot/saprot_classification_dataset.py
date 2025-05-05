@@ -43,20 +43,6 @@ class SaprotClassificationDataset(LMDBDataset):
         self.proteins_with_ligands_indexes = []
 
     def __getitem__(self, index):
-
-        # count = 0
-        # proteins = 0
-        # for ii in range(self.__len__()):
-        #     proteins += 1
-        #     entry = json.loads(self._get(ii))
-        #     uniprot_id, ligand_list = entry['name'], []
-        #     ligand_list = self.pdbbind_df[self.pdbbind_df['uniprot_id'] == uniprot_id][["smiles", "value", "ic50",
-        #                                                                                 "kd", "ki"]].values.tolist()
-        #     ligand_list = [(item[0], [item[1], item[2], item[3], item[4]]) for item in ligand_list]
-        #     if ligand_list:
-        #         count += 1
-        #     print(f"Number of proteins with ligands: {count}, from: {proteins}")
-
         entry = json.loads(self._get(index))
         seq = entry['seq']
 
@@ -69,35 +55,6 @@ class SaprotClassificationDataset(LMDBDataset):
         if ligand_list and uniprot_id not in self.proteins_with_ligands_ids:
             self.proteins_with_ligands_ids.append(uniprot_id)
             print("proteins with ligands:", len(self.proteins_with_ligands_ids))
-
-        # if uniprot_id in self.ligands_dataset:
-        #     ligand_list = [data_point['smi'] for data_point in
-        #                    self.ligands_dataset[uniprot_id] if 'smi' in data_point]
-        #     print("ligand_list:", len(ligand_list))
-
-        # else:
-        #     if uniprot_id not in self.proteins_without_ligands:
-        #         best_match, best_score = self.find_most_similar(uniprot_id, self.fetch_uniprot_sequence(uniprot_id),
-        #                                                         self.protein_sequences)
-        #         if best_score >= self.ligand_score_th:
-        #             ligand_list = [(data_point['smi'], data_point['label']['ic50']) for data_point in
-        #                              self.ligands_dataset[best_match] if
-        #                              'label' in data_point and 'ic50' in data_point['label']]
-        #             self.ligands_dataset[uniprot_id] = self.ligands_dataset[best_match]  # Cache the result for next iter
-        #         else:
-        #             self.proteins_without_ligands.append(uniprot_id)
-        #
-        # if uniprot_id not in self.proteins_with_ligands_ids and ligand_list:
-        #     print("new protein received")
-        #     self.proteins_with_ligands_ids.append(uniprot_id)
-        #     self.proteins_with_ligands_indexes.append(index)
-        #     print("proteins with ligands:", len(self.proteins_with_ligands_indexes))
-
-        # if not ligand_list:
-        #     if self.proteins_with_ligands_indexes:
-        #         new_index = random.sample(self.proteins_with_ligands_indexes, 1)[0]  # change to iterate pass
-        #         print("new_index:", new_index)
-        #         return self.__getitem__(new_index)
 
         # Mask structure tokens
         if self.mask_struc_ratio is not None:
@@ -153,4 +110,4 @@ class SaprotClassificationDataset(LMDBDataset):
         if self.use_bias_feature:
             inputs["coords"] = coords
 
-        return inputs, labels, ligand_list
+        return inputs, labels, ligand_list, None
