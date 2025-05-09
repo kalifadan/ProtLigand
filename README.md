@@ -91,5 +91,13 @@ python scripts/training.py -c config/Thermostability/protligand.yaml
 If you want to record the training process using wandb, you could modify the config file and set `Trainer.logger = True`,
 and then paste your wandb API key in the config key `setting.os_environ.WANDB_API_KEY`.
 
+## Interpretability of ProtLigand
+ProtLigand supports exporting raw prediction probabilities for downstream analysis or explainability.
+To export raw prediction scores for a given task, specify the output path using the `test_result_path` key in your model configuration file. For example:
+```yaml
+test_result_path: output/HumanPPI/ProtLigand.tsv
+```
+Then, you can use the `explainability.py` script to generate insights, as presented in the paper.
+
 ### Citation
 If you find this repository useful, please cite our paper.
