@@ -21,7 +21,7 @@ bash environment.sh
 
 ## Prepare the ProtLigand model
 ### Model checkpoints
-We provide the weights for the [ProtLigand](TBD) model, and the [Ligand Generator](TBD) (encoder+decoder) model.
+We provide the weights for the [ProtLigand](https://drive.google.com/file/d/1eDy9X_aZnCSlSNNPk8vw0gi9Eu6iSNJY/view?usp=sharing) model, and the [Ligand Generator](TBD) (encoder+decoder) model.
 
 ### Experimental results
 Some experimental results are listed below. For more details, please refer to our paper. For the fine-tuning tasks, the datasets were split based on 30% sequence identity.
