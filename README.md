@@ -49,7 +49,7 @@ print(f"combined_seq: {combined_seq}")
 ## Prepare dataset
 ### Pre-training dataset
 We provide the dataset for pre-training ProtLigand. The dataset can be downloaded from
-[here](https://drive.google.com/file/d/1sNxu22HDptZckgP3L22U-jJqmMfIgoH_/view?usp=sharing).
+[here](https://drive.google.com/file/d/1rGJoLows72n3ShJY7171EEPrR5pm_uZ9/view?usp=sharing).
 Once downloaded, the dataset needs to be decompressed and placed in the `LMDB` folder.
 
 To train the SaProt model (the base PLM), you need the dataset, which can be downloaded from
