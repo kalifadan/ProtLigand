@@ -1,7 +1,8 @@
-# Beyond the Leaderboard: Unveiling Biological Insights via a Protein-Ligand Learning Framework
+# Leaderboard: Leveraging Predictive Modeling for Protein-Ligand Insights and Discovery
 ## Dan Kalifa, Kira Radinsky, Eric Horvitz
 
-The repository is the official implementation of the paper: "Beyond the Leaderboard: Unveiling Biological Insights via a Protein-Ligand Learning Framework".
+The repository is the official implementation of the paper: "Leaderboard: Leveraging Predictive Modeling for Protein-Ligand Insights and Discovery".
+The paper is under review for the Bioinformatics journal by Oxford.
 
 ## ProtLigand Overview
 ![](figures/ProtLigand.png)
