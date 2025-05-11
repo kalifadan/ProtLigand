@@ -62,8 +62,7 @@ We provide datasets that are used in the paper. Datasets can be downloaded from
 Once downloaded, the datasets need to be decompressed and placed in the `LMDB` folder for supervised fine-tuning.
 
 ### Fair evaluation 
-For each benchmark task, to ensure fair and rigorous evaluation, any sequence in the pretraining set exhibiting >30% Needleman-Wunsch (NW) similarity to a test sequence is removed prior to training.
-
+We provide a general pre-training dataset and full benchmark datasets. For each benchmark task, especially new ones, to ensure fair and rigorous evaluation, users must remove any sequence from the pre-training set that exhibits >30% Needleman–Wunsch (NW) similarity to any test sequence prior to training.
 
 ## Training ProtLigand
 We provide a script to train the ProtLigand and the Ligand Generator model on the pre-training dataset.
