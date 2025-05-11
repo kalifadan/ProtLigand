@@ -61,7 +61,7 @@ We provide datasets that are used in the paper. Datasets can be downloaded from
 [here](https://drive.google.com/drive/folders/11dNGqPYfLE3M-Mbh4U7IQpuHxJpuRr4g?usp=sharing).
 Once downloaded, the datasets need to be decompressed and placed in the `LMDB` folder for supervised fine-tuning.
 
-### Fair evaluation 
+#### Fair evaluation 
 We provide a general pre-training dataset and full benchmark datasets. For each benchmark task, especially new ones, to ensure fair and rigorous evaluation, users must remove any sequence from the pre-training set that exhibits >30% Needleman–Wunsch (NW) similarity to any test sequence prior to training.
 
 ## Training ProtLigand
