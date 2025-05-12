@@ -110,11 +110,6 @@ class LigandDecoder(nn.Module):
         self.embedding = nn.Embedding(vocab_size, embedding_dim)
         self.positional_encoding = nn.Parameter(torch.randn(1, max_len, embedding_dim) * 0.02)
 
-        # decoder_layer = nn.TransformerDecoderLayer(
-        #     d_model=embedding_dim, nhead=4, dim_feedforward=512, batch_first=True
-        # )
-        # self.decoder = nn.TransformerDecoder(decoder_layer, num_layers=2)
-
         decoder_layer = nn.TransformerDecoderLayer(
             d_model=embedding_dim, nhead=8, dim_feedforward=512, batch_first=True
         )
@@ -223,12 +218,7 @@ class AbstractModel(pl.LightningModule):
         self.epoch = 0
 
         # ProtLigand Parameters
-        # self.ligand_tokenizer = AutoTokenizer.from_pretrained("pchanda/pretrained-smiles-pubchem10m")
-        # self.ligand_model = AutoModelForMaskedLM.from_pretrained("pchanda/pretrained-smiles-pubchem10m")
-
-        # self.ligand_tokenizer = AutoTokenizer.from_pretrained("DeepChem/ChemBERTa-77M-MLM")
         self.ligand_model = AutoModelForMaskedLM.from_pretrained("DeepChem/ChemBERTa-77M-MLM")
-
         self.chemberta_tokenizer = AutoTokenizer.from_pretrained("DeepChem/ChemBERTa-77M-MLM")
         self.ligand_tokenizer = SMILESTokenizer()
 
@@ -268,12 +258,6 @@ class AbstractModel(pl.LightningModule):
 
         self.ligand_proj = torch.nn.Linear(ligand_hidden_size, protein_hidden_size)
 
-        # self.ligand_generator = nn.Sequential(
-        #     nn.TransformerEncoder(
-        #         nn.TransformerEncoderLayer(d_model=protein_hidden_size, nhead=4, dim_feedforward=512, dropout=0.1,
-        #                                    batch_first=True), num_layers=2),
-        #     nn.Linear(protein_hidden_size, ligand_hidden_size)
-        # )
         self.ligand_generator = nn.Sequential(
             nn.TransformerEncoder(
                 nn.TransformerEncoderLayer(d_model=protein_hidden_size, nhead=8, dim_feedforward=512, dropout=0.1,
