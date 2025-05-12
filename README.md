@@ -22,7 +22,7 @@ bash environment.sh
 
 ## Prepare the ProtLigand model
 ### Model checkpoints
-We provide the weights for the [ProtLigand](https://drive.google.com/file/d/1eDy9X_aZnCSlSNNPk8vw0gi9Eu6iSNJY/view?usp=sharing) model, and the [Ligand Generator](https://drive.google.com/file/d/1Oyq4uQYaqeBBsAXedbnUs3YKbXjIQ1TI/view?usp=sharing) (encoder+decoder) model.
+We provide the weights for the [ProtLigand](https://drive.google.com/file/d/1eDy9X_aZnCSlSNNPk8vw0gi9Eu6iSNJY/view?usp=sharing) model, and the [Ligand Generator](https://drive.google.com/file/d/1Oyq4uQYaqeBBsAXedbnUs3YKbXjIQ1TI/view?usp=sharing) model.
 
 ### Experimental results
 Some experimental results are listed below. For more details, please refer to our paper. For the fine-tuning tasks, the datasets were split based on 30% sequence identity.
@@ -72,6 +72,7 @@ We provide a script to train the ProtLigand and the Ligand Generator model on th
 python scripts/training.py -c config/pretrain/ligand_generator.yaml
 ```
 Then, update the ligand generator path in the yaml of the protligand.yaml
+Also, you can train the ligand decoder using this line, with the reported hyperparameters.
 
 ```
 # Training ProtLigand model
