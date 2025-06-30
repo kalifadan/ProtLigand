@@ -5,10 +5,11 @@ The repository is the official implementation of the paper: "Leaderboard: Levera
 The paper is under review for the Bioinformatics journal by Oxford.
 
 ## ProtLigand - Pre-training Overview
-![](figures/ProtLigand_New.pdf)
+![](figures/ProtLigand_New-1.png)
 
-## ProtLigand - Inference - Overview - HumanPPI Classification
-![](figures/ppi_classification.pdf)
+## ProtLigand - Inference Overview
+An example of using the ProtLigand model for the HumanPPI classification task:
+<img src="figures/ppi_classification-1.png" width="600"/>
 
 Some code was borrowed from [SaProt](https://github.com/westlake-repl/SaProt) repository, which is our base PLM used by ProtLigand. 
 
@@ -23,12 +24,10 @@ conda activate ProtLigand
 bash environment.sh  
 ```
 
-## Prepare the ProtLigand model
-### Model checkpoints
-We provide the weights for the [ProtLigand](https://drive.google.com/file/d/1eDy9X_aZnCSlSNNPk8vw0gi9Eu6iSNJY/view?usp=sharing) model, and the [Ligand Generator](https://drive.google.com/file/d/1Oyq4uQYaqeBBsAXedbnUs3YKbXjIQ1TI/view?usp=sharing) model.
+## ProtLigand Usages
 
-### Experimental results
-Some experimental results are listed below. For more details, please refer to our paper. For the fine-tuning tasks, the datasets were split based on 30% sequence identity.
+### TBD - Inference 
+
 
 ### Convert protein structure into structure-aware sequence
 We provide a function to convert a protein structure into a structure-aware sequence. The function calls the 
@@ -50,13 +49,23 @@ print(f"foldseek_seq: {foldseek_seq}")
 print(f"combined_seq: {combined_seq}")
 ```
 
+
+
+## Prepare ProtLigand
+### Model checkpoints
+We provide the weights for the [ProtLigand](https://drive.google.com/file/d/1eDy9X_aZnCSlSNNPk8vw0gi9Eu6iSNJY/view?usp=sharing) model, and the [Ligand Generator](https://drive.google.com/file/d/1Oyq4uQYaqeBBsAXedbnUs3YKbXjIQ1TI/view?usp=sharing) model.
+After downloading, place these files in the appropriate `weights/` folder.
+
+### Experimental results
+Some experimental results are listed below. For more details, please refer to our paper. For the fine-tuning tasks, the datasets were split based on 30% sequence identity.
+
 ## Prepare dataset
 ### Pre-training dataset
 We provide the dataset for pre-training ProtLigand. The dataset can be downloaded from
 [here](https://drive.google.com/file/d/1rGJoLows72n3ShJY7171EEPrR5pm_uZ9/view?usp=sharing).
 Once downloaded, the dataset needs to be decompressed and placed in the `LMDB` folder.
 
-To train the SaProt model (the base PLM), you need the dataset, which can be downloaded from
+To train the SaProt model (the base PLM), you need the pre-training dataset, which can be downloaded from
 [here](https://huggingface.co/datasets/westlake-repl/AF2_UniRef50).
 
 ### Downstream tasks
@@ -65,7 +74,7 @@ We provide datasets that are used in the paper. Datasets can be downloaded from
 Once downloaded, the datasets need to be decompressed and placed in the `LMDB` folder for supervised fine-tuning.
 
 #### Fair evaluation 
-We provide a general pre-training dataset and full benchmark datasets. For each benchmark task, especially new ones, to ensure fair and rigorous evaluation, users must remove any sequence from the pre-training set that exhibits >30% Needleman–Wunsch (NW) similarity to any test sequence prior to training.
+We provide a general pre-training dataset and full benchmark datasets. For each benchmark task, especially new ones, to ensure fair and rigorous evaluation, users must remove any sequence from the pre-training set that exhibits >30% Needleman–Wunsch (NW) similarity to any test sequence before training.
 
 ## Training ProtLigand
 We provide a script to train the ProtLigand and the Ligand Generator model on the pre-training dataset.
@@ -74,7 +83,7 @@ We provide a script to train the ProtLigand and the Ligand Generator model on th
 # Training the Ligand Generator
 python scripts/training.py -c config/pretrain/ligand_generator.yaml
 ```
-Then, update the ligand generator path in the yaml of the protligand.yaml
+Then, update the ligand generator path in the YAML of the protligand.yaml
 Also, you can train the ligand decoder using this line, with the reported hyperparameters.
 
 ```
@@ -86,7 +95,7 @@ python scripts/training.py -c config/pretrain/protligand.yaml
 We provide a script to fine-tune ProtLigand on the datasets. The following code shows how to fine-tune ProtLigand on specific
 downstream tasks. Before running the code, please make sure that the datasets are placed in the `LMDB` folder and the
 ProtLigand and Ligand Generator weights are placed in the `weights/Pretrain` folder.
-**Note that the default training setting is not the same as in the paper because of the hardware limitation for different users. We recommend that users modify the yaml file flexibly based on their conditions (i.e. batch_size, devices, and accumulate_grad_batches).**
+**Note that the default training setting is not the same as in the paper because of the hardware limitation for different users. We recommend that users modify the YAML file flexibly based on their conditions (i.e., batch_size, devices, and accumulate_grad_batches).**
 
 ```
 # Fine-tune ProtLigand on the Thermostability task
@@ -94,8 +103,8 @@ python scripts/training.py -c config/Thermostability/protligand.yaml
 ```
 
 ### Record the training process (optional)
-If you want to record the training process using wandb, you could modify the config file and set `Trainer.logger = True`,
-and then paste your wandb API key in the config key `setting.os_environ.WANDB_API_KEY`.
+If you want to record the training process using wandb, you could modify the config file and set `Trainer.logger = True`, and then paste your wandb API key in the config key `setting.os_environ.WANDB_API_KEY`.
+
 
 ## Interpretability of ProtLigand
 ProtLigand supports exporting raw prediction probabilities for downstream analysis or explainability.
