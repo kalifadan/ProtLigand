@@ -4,8 +4,11 @@
 The repository is the official implementation of the paper: "Leaderboard: Leveraging Predictive Modeling for Protein-Ligand Insights and Discovery".
 The paper is under review for the Bioinformatics journal by Oxford.
 
-## ProtLigand Overview
-![](figures/ProtLigand.png)
+## ProtLigand - Pre-training Overview
+![](figures/ProtLigand_New.pdf)
+
+## ProtLigand - Inference - Overview - HumanPPI Classification
+![](figures/ppi_classification.pdf)
 
 Some code was borrowed from [SaProt](https://github.com/westlake-repl/SaProt) repository, which is our base PLM used by ProtLigand. 
 
