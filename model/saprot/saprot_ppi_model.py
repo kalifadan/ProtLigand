@@ -33,7 +33,9 @@ class SaprotPPIModel(SaprotBaseModel):
         setattr(self.model, "classifier", classifier)
 
     def initialize_metrics(self, stage):
-        return {f"{stage}_acc": torchmetrics.Accuracy()}
+        # You can add every metrics you need from the torchmetrics library, to all other models as well
+        return {f"{stage}_acc": torchmetrics.Accuracy(),
+                f"{stage}_auroc": torchmetrics.AUROC(task="binary")}
 
     def forward(self, inputs_1, inputs_2, ligands=None):
         if self.freeze_backbone:
@@ -93,8 +95,16 @@ class SaprotPPIModel(SaprotBaseModel):
                 w.write(f"{uniprot_id_1}\t{protein_type_1}\t{uniprot_id_2}\t{protein_type_2}\t{probs_str}\t{label.item()}\n")
 
         # Update metrics
-        for metric in self.metrics[stage].values():
-            metric.update(logits.detach(), label)
+        # for metric in self.metrics[stage].values():
+        #     metric.update(logits.detach(), label)
+
+        probs_pos = torch.softmax(logits, dim=1)[:, 1]  # shape [batch]
+
+        for name, metric in self.metrics[stage].items():
+            if "auroc" in name or "auprc" in name:
+                metric.update(probs_pos.detach(), label)
+            else:  # accuracy
+                metric.update(logits.detach(), label)
 
         if stage == "train":
             log_dict = self.get_log_dict("train")
