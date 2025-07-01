@@ -26,9 +26,6 @@ bash environment.sh
 
 ## ProtLigand Usages
 
-### TBD - Inference 
-
-
 ### Convert protein structure into structure-aware sequence
 We provide a function to convert a protein structure into a structure-aware sequence. The function calls the 
 [foldseek](https://github.com/steineggerlab/foldseek) 
@@ -47,6 +44,43 @@ seq, foldseek_seq, combined_seq = parsed_seqs
 print(f"seq: {seq}")
 print(f"foldseek_seq: {foldseek_seq}")
 print(f"combined_seq: {combined_seq}")
+```
+
+### ProtLigand Inference - Get protein embeddings
+
+During inference, ProtLigand can be used to generate representations of proteins.
+In this example, we load the ProtLigand model to obtain an embedding for each token in the input sequence.
+You can optionally aggregate these token-level embeddings into a single protein-level representation using a simple pooling strategy such as `mean`.
+
+```python
+from model.saprot.base import SaprotBaseModel
+from transformers import EsmTokenizer
+
+config = {
+    "task": "base",
+    "config_path": "weights/PLMs/SaProt_650M_AF2",
+    "load_pretrained": True,
+    "from_checkpoint": "weights/Pretrain/final_prot_ligand_model_large.pt",
+    "load_generator": "weights/Pretrain/ligand_generator_model_with_decoder_big.pt"
+}
+
+model = SaprotBaseModel(**config)
+tokenizer = EsmTokenizer.from_pretrained(config["config_path"])
+
+device = "cuda"
+model.to(device)
+
+seq = "M#EvVpQpL#VyQdYaKv"  # Here "#" represents lower plDDT regions (plddt < 70)
+tokens = tokenizer.tokenize(seq)
+print(tokens)
+
+inputs = tokenizer(seq, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+embedding = model.get_protein_representation(inputs)
+
+print(embedding.shape)
+print(embedding)
 ```
 
 
