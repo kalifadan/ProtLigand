@@ -5,7 +5,7 @@ The repository is the official implementation of the paper: "Leaderboard: Levera
 The paper is under review for the Bioinformatics journal by Oxford.
 
 ## ProtLigand - Pre-training Overview
-![](figures/ProtLigand_New-1.png)
+![](figures/ProtLigand_New.png)
 
 ## ProtLigand - Inference Overview
 An example of using the ProtLigand model for the HumanPPI classification task:
