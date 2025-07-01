@@ -182,6 +182,36 @@ class SaprotBaseModel(AbstractModel):
 
         return repr_list
 
+    def get_protein_representation(self, inputs, reduction: str = None):
+        """
+        Get hidden representation of a protein.
+
+        Args:
+            inputs:  A dictionary of inputs. It should contain keys ["input_ids", "attention_mask", "token_type_ids"].
+            reduction: Whether to reduce the hidden states. If None, the hidden states are not reduced. If "mean",
+                        the hidden states are averaged over the sequence length.
+
+        Returns:
+            hidden: A tensor. Each tensor is of shape [L, D], where L is the sequence length and D is
+                            the hidden dimension.
+        """
+        inputs["output_hidden_states"] = True
+        outputs = self.model.esm(**inputs)
+        hidden = outputs[0]
+        ligands_embeddings = self.ligand_generator(hidden[:, 0, :])
+        ligands_embeddings = self.ligand_proj(ligands_embeddings)  # [batch, ligand_dim] → [batch, hidden_dim]
+        ligands_embeddings = ligands_embeddings.unsqueeze(1).expand(-1, hidden.size(1), -1)  # Expand for attention
+
+        # Apply cross-attention (Protein as Query, Ligands as Key/Value)
+        attn_output, _ = self.cross_attention(
+            query=hidden,  # Protein embeddings
+            key=ligands_embeddings,
+            value=ligands_embeddings
+        )
+
+        hidden = hidden + attn_output  # Residual connection
+        return hidden
+
     # def add_bias_feature(self, inputs, coords: List[Dict]) -> torch.Tensor:
     #     """
     #     Add structure information as biases to attention map. This function is used to add structure information
