@@ -7,10 +7,6 @@ The paper is under review for the Bioinformatics journal by Oxford.
 ## ProtLigand - Pre-training Overview
 ![](figures/ProtLigand_New.png)
 
-## ProtLigand - Inference Overview
-An example of using the ProtLigand model for the HumanPPI classification task:
-<img src="figures/ppi_classification-1.png" width="600"/>
-
 Some code was borrowed from [SaProt](https://github.com/westlake-repl/SaProt) repository, which is our base PLM used by ProtLigand. 
 
 ## Environment installation
@@ -79,7 +75,16 @@ python scripts/training.py -c config/Thermostability/protligand.yaml
 If you want to record the training process using wandb, you could modify the config file and set `Trainer.logger = True`, and then paste your wandb API key in the config key `setting.os_environ.WANDB_API_KEY`.
 
 
-## ProtLigand Usages
+### Interpretability of ProtLigand (optional)
+ProtLigand supports exporting raw prediction probabilities for downstream analysis or explainability.
+To export raw prediction scores for a given task, specify the output path using the `test_result_path` key in your model configuration file. For example:
+```yaml
+test_result_path: output/HumanPPI/ProtLigand.tsv
+```
+Then, you can use the `explainability.py` script to generate insights, as presented in the paper.
+
+
+## ProtLigand Usages & Tutorials
 
 ### Convert protein structure into structure-aware sequence
 We provide a function to convert a protein structure into a structure-aware sequence. The function calls the 
@@ -138,14 +143,23 @@ print(embedding.shape)
 print(embedding)
 ```
 
+### Predict protein-protein interactions using ProtLigand
 
-## Interpretability of ProtLigand
-ProtLigand supports exporting raw prediction probabilities for downstream analysis or explainability.
-To export raw prediction scores for a given task, specify the output path using the `test_result_path` key in your model configuration file. For example:
+ProtLigand can be leveraged to predict protein–protein interactions (PPIs).
+The following figure illustrates the use of the ProtLigand model for the HumanPPI classification task:
+<img src="figures/ppi_classification-1.png" width="600"/>
+
+To run predictions, use the configuration file `config/HumanPPI/protligand.yaml` to specify the input protein pairs.
+Next, define the output path for the PPI prediction results:
+
 ```yaml
 test_result_path: output/HumanPPI/ProtLigand.tsv
 ```
-Then, you can use the `explainability.py` script to generate insights, as presented in the paper.
+Then, run the model to perform inference and predict whether each protein pair interacts:
+
+```
+python scripts/training.py -c config/HumanPPI/protligand.yaml
+```
 
 ## Citation
 If you find this repository useful, please cite our paper.
