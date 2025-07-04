@@ -24,67 +24,6 @@ conda activate ProtLigand
 bash environment.sh  
 ```
 
-## ProtLigand Usages
-
-### Convert protein structure into structure-aware sequence
-We provide a function to convert a protein structure into a structure-aware sequence. The function calls the 
-[foldseek](https://github.com/steineggerlab/foldseek) 
-binary file to encode the structure. You can download the binary file from [here](https://drive.google.com/file/d/1B_9t3n_nlj8Y3Kpc_mMjtMdY0OPYa7Re/view?usp=sharing) and place it in the `bin` folder
-. The following code shows how to use it.
-```python
-from utils.foldseek_util import get_struc_seq
-pdb_path = "example/8ac8.cif"
-
-# Extract the "A" chain from the pdb file and encode it into a struc_seq
-# pLDDT is used to mask low-confidence regions if "plddt_mask" is True. Please set it to True when
-# use AF2 structures for best performance.
-parsed_seqs = get_struc_seq("bin/foldseek", pdb_path, ["A"], plddt_mask=False)["A"]
-seq, foldseek_seq, combined_seq = parsed_seqs
-
-print(f"seq: {seq}")
-print(f"foldseek_seq: {foldseek_seq}")
-print(f"combined_seq: {combined_seq}")
-```
-
-### ProtLigand Inference - Get protein embeddings
-
-During inference, ProtLigand can be used to generate representations of proteins. When representing a given protein, we first generate its corresponding ligand and then create the final representation. In this example, we load the ProtLigand model to obtain an embedding for each token in the input sequence.
-You can optionally aggregate these token-level embeddings into a single protein-level representation using a simple pooling strategy such as `mean`.
-Using the `config` dict, you can provide the path for the `ProtLigand` model and for the `Ligand Generator`. 
-
-```python
-from model.saprot.base import SaprotBaseModel
-from transformers import EsmTokenizer
-
-config = {
-    "task": "base",
-    "config_path": "weights/PLMs/SaProt_650M_AF2",
-    "load_pretrained": True,
-    "from_checkpoint": "weights/Pretrain/final_prot_ligand_model_large.pt",
-    "load_generator": "weights/Pretrain/ligand_generator_model_with_decoder_big.pt"
-}
-
-model = SaprotBaseModel(**config)
-tokenizer = EsmTokenizer.from_pretrained(config["config_path"])
-
-device = "cuda"
-model.to(device)
-
-seq = "M#EvVpQpL#VyQdYaKv"  # Here "#" represents lower plDDT regions (plddt < 70)
-tokens = tokenizer.tokenize(seq)
-print(tokens)
-
-inputs = tokenizer(seq, return_tensors="pt")
-inputs = {k: v.to(device) for k, v in inputs.items()}
-
-embedding = model.get_protein_representation(inputs)
-
-print(embedding.shape)
-print(embedding)
-```
-
-
-
 ## Prepare ProtLigand
 ### Model checkpoints
 We provide the weights for the [ProtLigand](https://drive.google.com/file/d/1eDy9X_aZnCSlSNNPk8vw0gi9Eu6iSNJY/view?usp=sharing) model, and the [Ligand Generator](https://drive.google.com/file/d/1Oyq4uQYaqeBBsAXedbnUs3YKbXjIQ1TI/view?usp=sharing) model.
@@ -138,6 +77,66 @@ python scripts/training.py -c config/Thermostability/protligand.yaml
 
 ### Record the training process (optional)
 If you want to record the training process using wandb, you could modify the config file and set `Trainer.logger = True`, and then paste your wandb API key in the config key `setting.os_environ.WANDB_API_KEY`.
+
+
+## ProtLigand Usages
+
+### Convert protein structure into structure-aware sequence
+We provide a function to convert a protein structure into a structure-aware sequence. The function calls the 
+[foldseek](https://github.com/steineggerlab/foldseek) 
+binary file to encode the structure. You can download the binary file from [here](https://drive.google.com/file/d/1B_9t3n_nlj8Y3Kpc_mMjtMdY0OPYa7Re/view?usp=sharing) and place it in the `bin` folder
+. The following code shows how to use it.
+```python
+from utils.foldseek_util import get_struc_seq
+pdb_path = "example/8ac8.cif"
+
+# Extract the "A" chain from the pdb file and encode it into a struc_seq
+# pLDDT is used to mask low-confidence regions if "plddt_mask" is True. Please set it to True when
+# use AF2 structures for best performance.
+parsed_seqs = get_struc_seq("bin/foldseek", pdb_path, ["A"], plddt_mask=False)["A"]
+seq, foldseek_seq, combined_seq = parsed_seqs
+
+print(f"seq: {seq}")
+print(f"foldseek_seq: {foldseek_seq}")
+print(f"combined_seq: {combined_seq}")
+```
+
+
+### ProtLigand Inference - Get protein embeddings
+During inference, ProtLigand can be used to generate representations of proteins. When representing a given protein, we first generate its corresponding ligand and then create the final representation. In this example, we load the ProtLigand model to obtain an embedding for each token in the input sequence.
+You can optionally aggregate these token-level embeddings into a single protein-level representation using a simple pooling strategy such as `mean`.
+Using the `config` dict, you can provide the path for the `ProtLigand` model and for the `Ligand Generator`. 
+
+```python
+from model.saprot.base import SaprotBaseModel
+from transformers import EsmTokenizer
+
+config = {
+    "task": "base",
+    "config_path": "weights/PLMs/SaProt_650M_AF2",
+    "load_pretrained": True,
+    "from_checkpoint": "weights/Pretrain/final_prot_ligand_model_large.pt",
+    "load_generator": "weights/Pretrain/ligand_generator_model_with_decoder_big.pt"
+}
+
+model = SaprotBaseModel(**config)
+tokenizer = EsmTokenizer.from_pretrained(config["config_path"])
+
+device = "cuda"
+model.to(device)
+
+seq = "M#EvVpQpL#VyQdYaKv"  # Here "#" represents lower plDDT regions (plddt < 70)
+tokens = tokenizer.tokenize(seq)
+print(tokens)
+
+inputs = tokenizer(seq, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+embedding = model.get_protein_representation(inputs)
+
+print(embedding.shape)
+print(embedding)
+```
 
 
 ## Interpretability of ProtLigand
