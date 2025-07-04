@@ -147,5 +147,5 @@ test_result_path: output/HumanPPI/ProtLigand.tsv
 ```
 Then, you can use the `explainability.py` script to generate insights, as presented in the paper.
 
-### Citation
+## Citation
 If you find this repository useful, please cite our paper.
