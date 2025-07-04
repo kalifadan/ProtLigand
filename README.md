@@ -48,8 +48,7 @@ print(f"combined_seq: {combined_seq}")
 
 ### ProtLigand Inference - Get protein embeddings
 
-During inference, ProtLigand can be used to generate representations of proteins.
-In this example, we load the ProtLigand model to obtain an embedding for each token in the input sequence.
+During inference, ProtLigand can be used to generate representations of proteins. When representing a given protein, we first generate its corresponding ligand and then create the final representation. In this example, we load the ProtLigand model to obtain an embedding for each token in the input sequence.
 You can optionally aggregate these token-level embeddings into a single protein-level representation using a simple pooling strategy such as `mean`.
 Using the `config` dict, you can provide the path for the `ProtLigand` model and for the `Ligand Generator`. 
 
