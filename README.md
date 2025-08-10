@@ -1,7 +1,7 @@
 # Leaderboard: Leveraging Predictive Modeling for Protein-Ligand Insights and Discovery
 ## Dan Kalifa, Kira Radinsky, Eric Horvitz
 
-The repository is the official implementation of the paper: "Leaderboard: Leveraging Predictive Modeling for Protein-Ligand Insights and Discovery".
+The repository is the official implementation of the paper: "Leaderboard: Leveraging Predictive Modeling for Protein-Ligand Insights and Discovery", published in the [Bioinformatics journal] (https://academic.oup.com/bioinformatics/advance-article/doi/10.1093/bioinformatics/btaf425/8225721?searchresult=1).
 The paper is under review for the Bioinformatics journal by Oxford.
 
 ## ProtLigand - Pre-training Overview
